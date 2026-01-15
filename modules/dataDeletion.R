@@ -42,7 +42,7 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
 
     tagList(
       div(style = "margin-bottom: 15px;",
-          strong("Completeness"), br(),
+          strong("Consistency"), br(),
           span(style = "color: #28a745; font-size: 1.2em;", paste0(completeness, "%"))
       ),
       div(style = "margin-bottom: 15px;",
@@ -50,7 +50,7 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
           span(style = "color: #dc3545; font-size: 1.2em;", paste0(data_loss, "%"))
       ),
       div(style = "margin-bottom: 15px;",
-          strong("Daily Removed"), br(),
+          strong("Daily Removal"), br(),
           span(style = "font-size: 1.2em;", paste(daily_removed, "posts/day"))
       ),
       div(style = "margin-bottom: 15px;",

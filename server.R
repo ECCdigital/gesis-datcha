@@ -11,6 +11,63 @@ source("modules/dataEditing.R")
 
 # 2. Define server
 server <- function(input, output, session) {
+  
+  # GDPR Info Modal
+  observeEvent(input$show_gdpr_info, {
+    showModal(modalDialog(
+      title = "GDPR Compliance Confirmation",
+      size = "l",
+      easyClose = TRUE,
+      footer = modalButton("Close"),
+      tags$div(
+        tags$h4("What does 'GDPR-compliant' mean here?"),
+        tags$ul(
+          tags$li(tags$strong("Fully anonymized with no personal data:"), " Direct or indirect personal information that can identify individuals must be removed or aggregated. "),
+          tags$li(tags$strong("Data minimization:"), " Only data strictly necessary for your analysis is included.")
+        ),
+        tags$p(
+          "By checking the box, you confirm that you have properly anonymized and minimized the data before upload.",
+          tags$br(), tags$br(),
+          tags$a(href = "https://gdpr.eu/compliance/", target = "_blank", 
+                 "Everything you need to know about GDPR compliance →")
+        )
+      )
+    ))
+  })
+  
+  # === PRIVACY BANNER – COLLAPSIBLE VERSION ===
+  runjs("
+  const full = document.getElementById('privacy-full');
+  const mini = document.getElementById('privacy-minimized');
+  
+  const showFull = () => { full.style.display = 'block'; mini.style.display = 'none'; };
+  const showMini = () => { full.style.display = 'none'; mini.style.display = 'block'; };
+  
+  if (!localStorage.getItem('datcha_banner_minimized')) {
+    showFull();
+  } else {
+    showMini();
+  }
+")
+  
+  observeEvent(input$minimize_banner, {
+    runjs("
+    document.getElementById('privacy-full').style.display = 'none';
+    document.getElementById('privacy-minimized').style.display = 'block';
+    localStorage.setItem('datcha_banner_minimized', 'true');
+  ")
+  }, ignoreNULL = TRUE)
+  
+  observeEvent(input$expand_banner, {
+    runjs("
+    document.getElementById('privacy-full').style.display = 'block';
+    document.getElementById('privacy-minimized').style.display = 'none';
+    localStorage.removeItem('datcha_banner_minimized');
+  ")
+  }, ignoreNULL = TRUE)
+  
+  # === END BANNER ===
+  
   # Call common data handler from global.R
   shared_data <- common_data_handler(input, output, session)
   

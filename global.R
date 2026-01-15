@@ -82,6 +82,19 @@ shared_data <- reactiveValues(
   file2_uploaded = FALSE
 )
 
+# === GDPR COMPLIANCE ENFORCEMENT ===
+observe({
+  if (!isTRUE(input$gdpr1)) {
+    shinyjs::disable("file2")
+    shinyjs::disable("compare")
+    updateCheckboxInput(session, "gdpr2", value = FALSE)
+  } else if (!isTRUE(input$gdpr2)) {
+    shinyjs::disable("compare")
+  } else if (shared_data$file1_uploaded && shared_data$file2_uploaded) {
+    shinyjs::enable("compare")
+  }
+})
+
 # Function to detect the correct ID column
 detect_id_column <- function(df, manual_name = NULL) {
   possible_ids <- c("id", "tweet_id", "comment_id", "post_id", "status_id")
@@ -100,6 +113,17 @@ common_data_handler <- function(input, output, session) {
     shinyjs::disable("file2")
     shinyjs::disable("compare")
   })
+  
+  # Disable Dataset 2 upload until GDPR1 checked
+  observe({
+    if (input$gdpr1 && shared_data$file1_uploaded) {
+      shinyjs::enable("file2")
+    } else {
+      shinyjs::disable("file2")
+      updateCheckboxInput(session, "gdpr2", value = FALSE)  # optional reset
+    }
+  })
+  
   
   # Handle Dataset 1 upload and ID validation
   observeEvent(input$file1, {
@@ -336,9 +360,12 @@ common_data_handler <- function(input, output, session) {
     })
   })
   
-  # Enable Compare button when both datasets are valid
+  # Final Compare button control
   observe({
-    if (shared_data$file1_uploaded && shared_data$file2_uploaded) {
+    if (isTRUE(input$gdpr1) && 
+        isTRUE(input$gdpr2) && 
+        shared_data$file1_uploaded && 
+        shared_data$file2_uploaded) {
       shinyjs::enable("compare")
     } else {
       shinyjs::disable("compare")
