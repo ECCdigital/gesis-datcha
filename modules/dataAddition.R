@@ -49,28 +49,31 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     req(comparison_done(), added_posts(), data1(), input$date1, input$date2)
     
     days_diff <- as.numeric(difftime(input$date2, input$date1, units = "days"))
-    total_posts <- nrow(data1())
+    old_posts <- nrow(data1())
+    new_posts <- nrow(data2())
     added_count <- nrow(added_posts())
+    original_count <- nrow(original_posts())
     
-    growth <- round((added_count / total_posts * 100), 1)
+    consistency <- round((original_count / new_posts * 100), 1)
+    growth <- round((added_count / old_posts * 100), 1)
     daily_addition <- ifelse(days_diff > 0, round(added_count / days_diff, 1), "N/A")
-    daily_addition_percent <- ifelse(days_diff > 0, round((added_count / days_diff / total_posts * 100), 2), "N/A")
+    daily_addition_percent <- ifelse(days_diff > 0, round((added_count / days_diff / old_posts * 100), 2), "N/A")
     
     tagList(
       div(style = "margin-bottom: 15px;",
-          strong("Number of Added Posts"), br(),
-          span(style = "font-size: 1.2em;", added_count)
+          strong("Consistency"), br(),
+          span(style = "color: #28a745; font-size: 1.2em;", paste0(consistency, "%"))
       ),
       div(style = "margin-bottom: 15px;",
           strong("Data Addition"), br(),
           span(style = "color: #28a745; font-size: 1.2em;", paste0(growth, "%"))
       ),
       div(style = "margin-bottom: 15px;",
-          strong("Daily Addition Rate"), br(),
+          strong("Daily Addition"), br(),
           span(style = "font-size: 1.2em;", paste(daily_addition, "posts/day"))
       ),
       div(style = "margin-bottom: 15px;",
-          strong("Daily Added"), br(),
+          strong("Addition Rate"), br(),
           span(style = "font-size: 1.2em;", paste(daily_addition_percent, "%/day"))
       )
     )
@@ -112,6 +115,13 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       return("Number of Added Posts: 0 (No valid data)")
     }
     paste("Number of Added Posts:", nrow(added_posts())) # Display the count of added posts
+  })
+  
+  # Calculate consistency
+  output$completeness <- renderText({
+    req(comparison_done(), data1(), data2())
+    completeness <- (nrow(data2()) / nrow(data1())) * 100
+    paste("Completeness:", round(completeness, 1), "%")
   })
   
   # ===== Word Frequency Analysis ===== #

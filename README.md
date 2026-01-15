@@ -1,0 +1,2 @@
+# Datcha
+Datcha is a Shiny-based web application designed to compare two social media datasets collected at different times. It analyzes changes in posts, including deletions, additions, and edits, and provides insights through visualizations and metrics such as word frequency, keyness analysis, topic modeling, and sentiment analysis. The app is built using R and leverages packages like quanteda, sentimentr, topicmodels, diffobj, and highcharter.
