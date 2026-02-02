@@ -280,68 +280,80 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     return(json)
   }
 
-# ===== Modified LDAvis Output =====
-output$ldavis_output <- renderUI({
-  req(comparison_done(), input$num_topics)
-  
-  dataset_list <- list(
-    "Removed Posts" = removed_posts(),
-    "Remaining Posts" = remaining_posts(),
-    "Combined View" = bind_rows(
-      removed_posts() %>% mutate(group = "removed"),
-      remaining_posts() %>% mutate(group = "remaining")
-    )
-  )
-  
-  dataset <- dataset_list[[input$topic_dataset]]
-  
-  if (nrow(dataset) < 5 || all(dataset$text == "")) {
-    return(div(class = "alert alert-warning",
-                "Not enough text data for topic modeling (minimum 5 documents required)"))
-  }
-  
-  withProgress(message = 'Generating topics...', value = 0.5, {
-    cleaned <- text_processor$clean(dataset$text, use_stem = FALSE, use_lemma = TRUE)
-    corpus <- Corpus(VectorSource(cleaned))
-    dtm <- DocumentTermMatrix(corpus)
-    dtm <- dtm[rowSums(as.matrix(dtm)) > 0, ]
+  output$ldavis_output <- renderUI({
+    req(comparison_done(), input$num_topics)
     
-    if (nrow(dtm) < 5 || ncol(dtm) < 5) {
-      return(div(class = "alert alert-danger",
-                  "Topic modeling failed - insufficient meaningful text patterns"))
-    }
-    
-    lda_model <- tryCatch({
-      LDA(dtm, k = input$num_topics, control = list(seed = 1234))
-    }, error = function(e) NULL)
-    
-    if (is.null(lda_model)) {
-      return(div(class = "alert alert-danger",
-                  "LDA Model could not be built."))
-    }
-    
-    # Get the LDAvis JSON
-    json <- topicmodels_json_ldavis(lda_model, cleaned, dtm)
-    
-    # Add topic highlighting if a topic is selected
-    vis <- LDAvis::renderVis(json)
-    
-    if(current_topic() > 0) {
-      tagList(
-        vis,
-        tags$script(HTML(sprintf('
-          $(document).ready(function() {
-            setTimeout(function() {
-              $(".lda-topic[data-topic-id=\'%s\']").addClass("highlight-topic");
-            }, 1000);
-          });
-        ', current_topic() - 1)))  # LDAvis uses 0-based indexing
+    dataset_list <- list(
+      "Removed Posts" = removed_posts(),
+      "Remaining Posts" = remaining_posts(),
+      "Combined View" = bind_rows(
+        removed_posts() %>% mutate(group = "removed"),
+        remaining_posts() %>% mutate(group = "remaining")
       )
-    } else {
-      vis
+    )
+    
+    dataset <- dataset_list[[input$topic_dataset]]
+    
+    if (nrow(dataset) < 5 || all(dataset$text == "")) {
+      return(div(class = "alert alert-warning",
+                 "Not enough text data for topic modeling (minimum 5 documents required)"))
     }
+    
+    withProgress(message = 'Generating topics...', value = 0.5, {
+      cleaned <- text_processor$clean(dataset$text, use_stem = FALSE, use_lemma = TRUE)
+      corpus <- Corpus(VectorSource(cleaned))
+      dtm <- DocumentTermMatrix(corpus)
+      dtm <- dtm[rowSums(as.matrix(dtm)) > 0, ]
+      
+      if (nrow(dtm) < 5 || ncol(dtm) < 5) {
+        return(div(class = "alert alert-danger",
+                   "Topic modeling failed - insufficient meaningful text patterns"))
+      }
+      
+      lda_model <- tryCatch({
+        LDA(dtm, k = input$num_topics, control = list(seed = 1234))
+      }, error = function(e) NULL)
+      
+      if (is.null(lda_model)) {
+        return(div(class = "alert alert-danger",
+                   "LDA Model could not be built."))
+      }
+      
+      # Get the LDAvis JSON
+      json <- topicmodels_json_ldavis(lda_model, cleaned, dtm)
+      
+      # Create a container with proper dimensions - INCREASED HEIGHT
+      div(
+        style = "width: 100%; height: 80vh; min-height: 600px; max-height: 900px; 
+           border: 1px solid #ddd; border-radius: 8px; overflow: hidden; 
+           position: relative; background: white; margin-bottom: 20px;",
+        div(
+          id = "ldavis-wrapper-deletion",
+          style = "width: 100%; height: 100%; overflow: auto; position: relative;",
+          LDAvis::renderVis(json),
+          tags$script(HTML("
+  $(document).on('shiny:outputinvalidated.ldavis_output shown.bs.tab', function() {
+    setTimeout(function() {
+      var wrapper = $('#ldavis-wrapper-deletion')[0];
+      if (!wrapper) return;
+      
+      // Remove all but the first slider and controls
+      wrapper.querySelectorAll('input[type=\"range\"]').forEach((el, i) => {
+        if (i > 0) el.closest('div')?.remove();
+      });
+      wrapper.querySelectorAll('.ldavis-control-label').forEach((el, i) => {
+        if (i > 0) el.parentNode?.remove();
+      });
+      wrapper.querySelectorAll('.ldavis-control').forEach((el, i) => {
+        if (i > 0) el.parentNode?.remove();
+      });
+    }, 500);
+  });
+"))
+        )
+      )
+    })
   })
-})
 
 # ===== Sentiment Analysis ===== #
 get_sentiment_distribution <- function(text_vector) {

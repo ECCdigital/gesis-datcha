@@ -744,38 +744,72 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       
       json <- topicmodels_json_ldavis(lda_model, cleaned, dtm)
       
-      vis <- LDAvis::renderVis(json)
-      
-      if(current_topic_addition() > 0) {
-        tagList(
-          vis,
-          tags$script(HTML(sprintf('
+      # Create a container with proper dimensions - INCREASED HEIGHT
+      div(
+        style = "width: 100%; height: 80vh; min-height: 600px; max-height: 900px; 
+               border: 1px solid #ddd; border-radius: 8px; overflow: hidden; 
+               position: relative; background: white; margin-bottom: 20px;",
+        div(
+          id = "ldavis-wrapper-addition",
+          style = "width: 100%; height: 100%; overflow: auto; position: relative;",
+          LDAvis::renderVis(json),
+          tags$script(HTML("
+          // Fix for LDAvis to prevent duplicate sliders and overlap
           $(document).ready(function() {
             setTimeout(function() {
-              $(".lda-topic[data-topic-id=\'%s\']").addClass("highlight-topic");
-              $(".lda-topic").hover(
-                function() { $(this).addClass("highlight-topic").css("cursor", "pointer"); },
-                function() { $(this).removeClass("highlight-topic"); }
-              );
-            }, 1000);
+              const wrapper = document.getElementById('ldavis-wrapper-addition');
+              if (wrapper) {
+                // Remove duplicate sliders
+                const sliders = wrapper.querySelectorAll('input[type=\"range\"]');
+                if (sliders.length > 1) {
+                  for (let i = 1; i < sliders.length; i++) {
+                    if (sliders[i].parentNode) {
+                      sliders[i].parentNode.remove();
+                    }
+                  }
+                }
+                
+                // Remove duplicate slider labels
+                const labels = wrapper.querySelectorAll('.ldavis-control-label');
+                if (labels.length > 1) {
+                  for (let i = 1; i < labels.length; i++) {
+                    labels[i].remove();
+                  }
+                }
+                
+                // Fix iframe sizing
+                const iframe = wrapper.querySelector('iframe');
+                if (iframe) {
+                  iframe.style.width = '100%';
+                  iframe.style.height = '100%';
+                  iframe.style.minHeight = '600px';
+                  iframe.style.border = 'none';
+                }
+              }
+            }, 500); // Increased delay to ensure LDAvis is fully rendered
           });
-        ', current_topic_addition() - 1)))
-        )
-      } else {
-        tagList(
-          vis,
-          tags$script(HTML('
-          $(document).ready(function() {
-            $(".lda-topic").hover(
-              function() { $(this).addClass("highlight-topic").css("cursor", "pointer"); },
-              function() { $(this).removeClass("highlight-topic"); }
-            );
+          
+          // Additional cleanup on resize
+          $(window).on('resize', function() {
+            setTimeout(function() {
+              const wrapper = document.getElementById('ldavis-wrapper-addition');
+              if (wrapper) {
+                const sliders = wrapper.querySelectorAll('input[type=\"range\"]');
+                if (sliders.length > 1) {
+                  for (let i = 1; i < sliders.length; i++) {
+                    if (sliders[i].parentNode) {
+                      sliders[i].parentNode.remove();
+                    }
+                  }
+                }
+              }
+            }, 200);
           });
-        '))
+        "))
         )
-      }
-    })
+    )
   })
+})
   
   # Update the return statement to include current_topic_addition (unchanged from your code):
   

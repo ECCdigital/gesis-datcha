@@ -21,12 +21,12 @@ title = div(
 tags$footer(class = "app-footer",
             tags$div(
               HTML("&copy; 2025 Datcha &nbsp; • &nbsp;"),
-              tags$a(href = "https://www.gesis.org/impressum", 
+              tags$a(href = "https://www.gesis.org/en/institute/imprint", 
                      target = "_blank", 
                      style = "color: #a0d8ff; text-decoration: underline;", 
                      "Imprint"),
               HTML(" &nbsp; • &nbsp; "),
-              tags$a(href = "https://www.gesis.org/datenschutz", 
+              tags$a(href = "https://www.gesis.org/en/institute/data-protection", 
                      target = "_blank", 
                      style = "color: #a0d8ff; text-decoration: underline;", 
                      "Data Protection")
@@ -154,6 +154,49 @@ tags$style(HTML("
                          onclick = "Shiny.setInputValue('expand_banner', Math.random());",
                          "i")
                  ),
+
+# tags$head(
+#   tags$style(HTML("
+#   /* LDAvis container styling - prevent footer overlap */
+#   #ldavis_output,
+#   #ldavis_output_addition,
+#   #ldavis_output_editing {
+#     overflow: hidden !important;
+#     min-height: 500px !important;
+#     height: calc(100vh - 200px) !important; /* Adjust based on your layout */
+#     width: 100% !important;
+#     margin-bottom: 40px !important;
+#     border: 1px solid #ddd;
+#     border-radius: 8px;
+#     position: relative;
+#   }
+# 
+#   /* Ensure LDAvis iframe stays within bounds */
+#   #ldavis_output iframe,
+#   #ldavis_output_addition iframe,
+#   #ldavis_output_editing iframe {
+#     width: 100% !important;
+#     height: 100% !important;
+#     min-height: 500px !important;
+#     max-height: calc(100vh - 250px) !important; /* Account for footer */
+#     border: none !important;
+#     position: relative !important;
+#   }
+# 
+#   /* Container wrappers for topic modeling tabs */
+#   #data_deletion_tabs .tab-content,
+#   #data_addition .tab-content {
+#     position: relative;
+#     padding-bottom: 20px;
+#   }
+#   
+#   /* Specific override for Topic Modeling tab panels */
+#   #data_deletion_tabs [data-value='Topic Modeling'] .tab-pane,
+#   #data_addition [data-value='Topic Modeling'] .tab-pane {
+#     padding-bottom: 50px !important; /* Extra padding to avoid footer */
+#   }
+# "))
+# ),
                  # 0. Overview Page
                  tabPanel("Overview",
                           fluidPage(
