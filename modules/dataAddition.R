@@ -658,7 +658,6 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
   })
   
   # Ensure the topicmodels_json_ldavis function is included (unchanged from your provided code):
-  
   topicmodels_json_ldavis <- function(fitted, text_vector, doc_term) {
     library(dplyr)
     library(stringi)
@@ -667,26 +666,37 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     theta <- posterior(fitted)$topics %>% as.matrix()
     vocab <- colnames(phi)
     
-    doc_length <- sapply(text_vector, function(x) {
-      stri_count(x, regex = "\\S+")
-    })
+    # Get indices of documents that survived in dtm
+    valid_rows <- which(rowSums(as.matrix(doc_term)) > 0)
     
-    temp_frequency <- as.matrix(doc_term)
-    freq_matrix <- data.frame(ST = colnames(temp_frequency),
-                              Freq = colSums(temp_frequency))
+    # Subset theta and text_vector to match the filtered dtm
+    theta <- theta[valid_rows, , drop = FALSE]
+    text_vector_filtered <- text_vector[valid_rows]
+    
+    # Now calculate doc.length on the filtered texts
+    doc_length <- vapply(text_vector_filtered, function(x) stri_count(x, regex = "\\S+"), integer(1))
+    
+    # Term frequencies from the filtered dtm
+    term_freq <- colSums(as.matrix(doc_term))
     
     json <- tryCatch({
-      LDAvis::createJSON(phi = phi, theta = theta,
-                         vocab = vocab,
-                         doc.length = doc_length,
-                         term.frequency = freq_matrix$Freq,
-                         mds.method = stats::cmdscale)
+      LDAvis::createJSON(
+        phi = phi,
+        theta = theta,
+        vocab = vocab,
+        doc.length = doc_length,
+        term.frequency = term_freq,
+        mds.method = stats::cmdscale
+      )
     }, error = function(e) {
-      LDAvis::createJSON(phi = phi, theta = theta,
-                         vocab = vocab,
-                         doc.length = doc_length,
-                         term.frequency = freq_matrix$Freq,
-                         mds.method = function(x) { prcomp(x)$x[,1:2] })
+      LDAvis::createJSON(
+        phi = phi,
+        theta = theta,
+        vocab = vocab,
+        doc.length = doc_length,
+        term.frequency = term_freq,
+        mds.method = function(x) prcomp(x)$x[, 1:2]
+      )
     })
     
     return(json)
@@ -697,119 +707,184 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     req(comparison_done(), input$num_topics_addition)
     
     dataset_list <- list(
-      "Added Posts" = added_posts(),
-      "Original Posts" = original_posts(),
-      "Combined View" = bind_rows(
-        added_posts() %>% mutate(group = "added"),
+      "Added Posts"     = added_posts(),
+      "Original Posts"  = original_posts(),
+      "Combined View"   = bind_rows(
+        added_posts()    %>% mutate(group = "added"),
         original_posts() %>% mutate(group = "original")
       )
     )
     
     dataset <- dataset_list[[input$topic_dataset_addition]]
     
-    if (nrow(dataset) < 5 || all(dataset$text == "" | is.na(dataset$text))) {
-      return(div(class = "alert alert-warning",
-                 "Not enough valid text data for topic modeling (minimum 5 non-empty documents required)"))
+    # ── Early exit: too few documents or almost no valid text ──
+    texts     <- dataset$text[!is.na(dataset$text) & nzchar(trimws(dataset$text))]
+    n_valid   <- length(texts)
+    
+    if (n_valid < 20) {
+      return(div(class = "alert alert-danger",
+                 "Too few valid non-empty documents (", n_valid, ") → topic modeling impossible"))
     }
     
-    withProgress(message = 'Generating topics...', value = 0.5, {
-      cleaned <- text_processor$clean(dataset$text, use_stem = FALSE, use_lemma = TRUE)
-      valid_docs <- which(cleaned != "" & !is.na(cleaned))
-      if (length(valid_docs) < 5) {
-        return(div(class = "alert alert-warning",
-                   "After preprocessing, fewer than 5 valid documents remain for topic modeling"))
-      }
+    # ── Check diversity (especially useful for repetitive Added/Original/Combined) ──
+    # Sample up to 500 to avoid very long computation on huge datasets
+    cleaned_sample <- head(text_processor$clean(texts, use_stem = FALSE, use_lemma = TRUE), 500)
+    cleaned_sample <- cleaned_sample[nzchar(cleaned_sample)]  # remove any empty after cleaning
+    n_unique_clean <- length(unique(cleaned_sample))
+    
+    diversity_ratio <- n_unique_clean / min(n_valid, 500)
+    
+    if (diversity_ratio < 0.15 || n_unique_clean < 40) {
+      return(div(class = "alert alert-warning",
+                 "Topic modeling not meaningful — very low text diversity",
+                 tags$br(),
+                 sprintf("Documents: %d   •   Unique cleaned (sample): %d (%.0f%% diversity)", 
+                         n_valid, n_unique_clean, 100 * diversity_ratio),
+                 tags$br(), tags$br(),
+                 "Likely caused by near-identical, cyclic or boilerplate content."
+      ))
+    }
+    
+    withProgress(message = 'Checking dataset size...', value = 0.1, {
       
-      cleaned <- cleaned[valid_docs]
-      corpus <- Corpus(VectorSource(cleaned))
-      dtm <- DocumentTermMatrix(corpus)
-      dtm <- dtm[rowSums(as.matrix(dtm)) > 0, ]
+      MAX_DOCS_FOR_TOPIC_MODELING <- 15000
       
-      if (nrow(dtm) < 5 || ncol(dtm) < 5) {
-        return(div(class = "alert alert-danger",
-                   "Topic modeling failed - insufficient meaningful text patterns after preprocessing"))
-      }
-      
-      lda_model <- tryCatch({
-        LDA(dtm, k = input$num_topics_addition, control = list(seed = 1234))
-      }, error = function(e) {
-        showNotification(paste("Error in topic modeling:", e$message), type = "error")
-        return(NULL)
-      })
-      
-      if (is.null(lda_model)) {
-        return(div(class = "alert alert-danger",
-                   "Topic modeling failed - please check your data"))
-      }
-      
-      json <- topicmodels_json_ldavis(lda_model, cleaned, dtm)
-      
-      # Create a container with proper dimensions - INCREASED HEIGHT
-      div(
-        style = "width: 100%; height: 80vh; min-height: 600px; max-height: 900px; 
-               border: 1px solid #ddd; border-radius: 8px; overflow: hidden; 
-               position: relative; background: white; margin-bottom: 20px;",
-        div(
-          id = "ldavis-wrapper-addition",
-          style = "width: 100%; height: 100%; overflow: auto; position: relative;",
-          LDAvis::renderVis(json),
-          tags$script(HTML("
-          // Fix for LDAvis to prevent duplicate sliders and overlap
-          $(document).ready(function() {
-            setTimeout(function() {
-              const wrapper = document.getElementById('ldavis-wrapper-addition');
-              if (wrapper) {
-                // Remove duplicate sliders
-                const sliders = wrapper.querySelectorAll('input[type=\"range\"]');
-                if (sliders.length > 1) {
-                  for (let i = 1; i < sliders.length; i++) {
-                    if (sliders[i].parentNode) {
-                      sliders[i].parentNode.remove();
-                    }
-                  }
-                }
-                
-                // Remove duplicate slider labels
-                const labels = wrapper.querySelectorAll('.ldavis-control-label');
-                if (labels.length > 1) {
-                  for (let i = 1; i < labels.length; i++) {
-                    labels[i].remove();
-                  }
-                }
-                
-                // Fix iframe sizing
-                const iframe = wrapper.querySelector('iframe');
-                if (iframe) {
-                  iframe.style.width = '100%';
-                  iframe.style.height = '100%';
-                  iframe.style.minHeight = '600px';
-                  iframe.style.border = 'none';
-                }
-              }
-            }, 500); // Increased delay to ensure LDAvis is fully rendered
-          });
-          
-          // Additional cleanup on resize
-          $(window).on('resize', function() {
-            setTimeout(function() {
-              const wrapper = document.getElementById('ldavis-wrapper-addition');
-              if (wrapper) {
-                const sliders = wrapper.querySelectorAll('input[type=\"range\"]');
-                if (sliders.length > 1) {
-                  for (let i = 1; i < sliders.length; i++) {
-                    if (sliders[i].parentNode) {
-                      sliders[i].parentNode.remove();
-                    }
-                  }
-                }
-              }
-            }, 200);
-          });
-        "))
+      if (nrow(dataset) > MAX_DOCS_FOR_TOPIC_MODELING) {
+        view_name <- switch(input$topic_dataset_addition,
+                            "Added Posts"    = "Added Posts view",
+                            "Original Posts" = "Original Posts view",
+                            "Combined View"  = "Combined View (Added + Original)",
+                            input$topic_dataset_addition)  # fallback
+        
+        return(
+          div(class = "alert alert-warning", style = "margin: 20px;",
+              icon("exclamation-triangle"),
+              tags$strong("Topic modeling not available for this view"),
+              tags$p(
+                "The ", strong(view_name), " contains ", nrow(dataset), " posts.",
+                tags$br(),
+                "Topic modeling is limited to ", MAX_DOCS_FOR_TOPIC_MODELING, " documents to avoid long waits and to ensure smooth performance.",
+                tags$br(), tags$br(),
+                # "Try switching to ",
+                # if (input$topic_dataset_addition != "Added Posts")   tags$strong("Added Posts"),
+                # if (input$topic_dataset_addition != "Original Posts") tags$strong("Original Posts"),
+                # " view — they are usually smaller and should work.",
+                # tags$br(), tags$br(),
+                # #"Word frequency, keyness, and sentiment analysis are still available."
+              )
+          )
         )
-    )
-  })
-})
+      }
+      
+      # ── only reach here if size OK ──
+      withProgress(message = 'Generating topics...', value = 0.5, {
+        
+        cleaned <- text_processor$clean(dataset$text, use_stem = FALSE, use_lemma = TRUE)
+        valid_docs <- which(cleaned != "" & !is.na(cleaned))
+        if (length(valid_docs) < 5) {
+          return(div(class = "alert alert-warning",
+                     "After preprocessing, fewer than 5 valid documents remain for topic modeling"))
+        }
+        
+        cleaned <- cleaned[valid_docs]
+        corpus <- Corpus(VectorSource(cleaned))
+        dtm <- DocumentTermMatrix(corpus)
+        dtm <- dtm[rowSums(as.matrix(dtm)) > 0, ]
+        
+        if (nrow(dtm) < 5 || ncol(dtm) < 5) {
+          return(div(class = "alert alert-danger",
+                     "Topic modeling failed - insufficient meaningful text patterns after preprocessing"))
+        }
+        
+        # Adaptive number of topics
+        n_unique <- length(unique(cleaned))
+        k_adaptive <- max(2, min(input$num_topics_addition, round(n_unique / 8)))
+        if (n_unique < 150) k_adaptive <- max(2, min(4, round(n_unique / 10)))
+        
+        lda_model <- tryCatch({
+          LDA(dtm, k = input$num_topics_addition, control = list(seed = 1234))
+        }, error = function(e) {
+          showNotification(paste("Error in topic modeling:", e$message), type = "error")
+          return(NULL)
+        })
+        
+        if (is.null(lda_model)) {
+          return(div(class = "alert alert-danger",
+                     "Topic modeling failed - please check your data"))
+        }
+        
+        json <- topicmodels_json_ldavis(lda_model, cleaned, dtm)
+        
+        div(
+          style = "width: 100%; height: 80vh; min-height: 600px; max-height: 900px; 
+                 border: 1px solid #ddd; border-radius: 8px; overflow: hidden; 
+                 position: relative; background: white; margin-bottom: 20px;",
+          div(
+            id = "ldavis-wrapper-addition",
+            style = "width: 100%; height: 100%; overflow: auto; position: relative;",
+            LDAvis::renderVis(json),
+            tags$script(HTML("
+  function cleanupLDAvisAddition() {
+    const wrapper = document.getElementById('ldavis-wrapper-addition');
+    if (!wrapper) return;
+
+    // Remove ALL duplicate sliders (keep only the first)
+    const sliders = wrapper.querySelectorAll('input[type=\"range\"]');
+    sliders.forEach((slider, i) => {
+      if (i > 0) {
+        const container = slider.closest('.ldavis-control') || slider.parentElement;
+        if (container) container.remove();
+      }
+    });
+
+    // Remove duplicate labels completely
+    const labels = wrapper.querySelectorAll('.ldavis-control-label, .ldavis-control');
+    labels.forEach((label, i) => {
+      if (i > 0) label.remove();
+    });
+
+    // Remove duplicate radio buttons (keep only first two: Overall / Term)
+    const radios = wrapper.querySelectorAll('input[type=\"radio\"][name=\"term\"]');
+    radios.forEach((radio, i) => {
+      if (i >= 2) {
+        const lbl = radio.closest('label') || radio.parentElement;
+        if (lbl) lbl.remove();
+      }
+    });
+
+    // Force resize & visibility on the actual visualization
+    const vis = wrapper.querySelector('.vis, .ldavis, svg');
+    if (vis) {
+      vis.style.width = '100%';
+      vis.style.height = '100%';
+      vis.style.display = 'block';
+    }
+  }
+
+  // Run immediately after load + delay
+  $(document).ready(() => {
+    setTimeout(cleanupLDAvisAddition, 600);
+    setTimeout(cleanupLDAvisAddition, 1800);  // second pass
+  });
+
+  // Re-run on tab shown (very important in tabsetPanel)
+  $(document).on('shown.bs.tab', 'a[data-toggle=\"tab\"], .nav-link', function(e) {
+    setTimeout(cleanupLDAvisAddition, 400);
+  });
+
+  // Re-run on window resize
+  $(window).on('resize', () => {
+    setTimeout(cleanupLDAvisAddition, 300);
+  });
+"))
+          )
+        )
+        
+      })  # closes inner withProgress
+      
+    })    # closes outer withProgress
+    
+  })      # closes renderUI
   
   # Update the return statement to include current_topic_addition (unchanged from your code):
   
