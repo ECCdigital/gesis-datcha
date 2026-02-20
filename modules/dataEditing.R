@@ -54,9 +54,22 @@ dataEditingModule <- function(input, output, session, shared_data, detect_id_col
   # Reactive Data Editing Section
   output$data_editing_ui <- renderUI({
     req(comparison_done())
-    tagList(
-      htmlOutput("edit_distance_summary_ui")
-    )
+    
+    if (is.null(edit_distances())) {
+      tags$hr(style = "border-top: 1px solid #1c4474; margin: 20px 0;")
+      # This branch is shown while calculation is running (very short time normally)
+      tagList(
+        div(style = "padding: 30px; text-align: center; color: #1c4474; font-size: 1.1em;",
+            icon("spinner", class = "fa-spin fa-2x"),
+            tags$br(), tags$br(),
+            "Calculating edit distances and text differences... please wait."
+        )
+      )
+    } else {
+      tagList(
+        htmlOutput("edit_distance_summary_ui")
+      )
+    }
   })
 
   # Editing statistics UI
@@ -64,6 +77,22 @@ dataEditingModule <- function(input, output, session, shared_data, detect_id_col
     req(edit_distances())
     
     dist_data <- edit_distances()
+    edited_count <- sum(dist_data$edit_distance > 0, na.rm = TRUE)
+    total_matched <- nrow(dist_data)
+    days_diff <- as.numeric(difftime(input$date2, input$date1, units = "days"))
+    
+    # Avoid division by zero
+    daily_editing <- ifelse(days_diff > 0, round(edited_count / days_diff, 1), "N/A")
+    editing_rate_percent_per_day <- ifelse(days_diff > 0 && total_matched > 0,
+                                           round((edited_count / days_diff / total_matched * 100), 2),
+                                           "N/A")
+    edited_ratio <- ifelse(total_matched > 0, round((edited_count / total_matched) * 100, 1), 0)
+    
+    tagList(
+
+    )
+  
+    
     mean_edit <- ifelse(nrow(dist_data) > 0, mean(dist_data$edit_distance, na.rm = TRUE), 0)
     mean_norm <- ifelse(nrow(dist_data) > 0, mean(dist_data$normalized_distance, na.rm = TRUE), 0)
     edited_count <- sum(dist_data$edit_distance > 0, na.rm = TRUE)
@@ -71,6 +100,22 @@ dataEditingModule <- function(input, output, session, shared_data, detect_id_col
     ratio <- ifelse(total_posts > 0, round((edited_count/total_posts)*100, 1), 0)
     
     tagList(
+      div(style = "margin-bottom: 15px;",
+          strong("Data Editing"), br(),
+          span(style = "font-size: 1.2em;", paste0(edited_count, " / ", total_matched))
+      ),
+      div(style = "margin-bottom: 15px;",
+          strong("Editing Ratio"), br(),
+          span(style = "font-size: 1.2em;", paste0(edited_ratio, "%"))
+      ),
+      div(style = "margin-bottom: 15px;",
+          strong("Daily Editing"), br(),
+          span(style = "font-size: 1.2em;", paste(daily_editing, "posts/day"))
+      ),
+      div(style = "margin-bottom: 15px;",
+          strong("Editing Rate"), br(),
+          span(style = "font-size: 1.2em;", paste(editing_rate_percent_per_day, "%/day"))
+      ),
       div(style = "margin-bottom: 15px;",
           strong("Mean Edit Distance"), br(),
           span(style = "font-size: 1.2em;", round(mean_edit, 3)),
@@ -83,13 +128,13 @@ dataEditingModule <- function(input, output, session, shared_data, detect_id_col
           span(icon("info-circle"), id = "norm_dist_info",
                `data-toggle` = "tooltip", title = "Average edit distance normalized by post length (0-1 scale)")
       ),
-      div(style = "margin-bottom: 15px;",
-          strong("Edited Post Ratio"), br(),
-          span(style = "font-size: 1.2em;", paste0(ratio, "%")),
-          span(icon("info-circle"), id = "edit_ratio_info",
-               `data-toggle` = "tooltip", title = "Percentage of matched posts that were edited")
+      # div(style = "margin-bottom: 15px;",
+      #     strong("Edited Post Ratio"), br(),
+      #     span(style = "font-size: 1.2em;", paste0(ratio, "%")),
+      #     span(icon("info-circle"), id = "edit_ratio_info",
+      #          `data-toggle` = "tooltip", title = "Percentage of matched posts that were edited")
+      # )
       )
-    )
   })
 
 

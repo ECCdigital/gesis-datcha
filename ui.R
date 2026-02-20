@@ -1,8 +1,39 @@
 # ====================== #
 # UI DEFINITION
 # ====================== #
-ui <- navbarPage("Datcha",
-                 # Update navbar color and button styles
+ui <- navbarPage(
+title = div(
+  style = "display: flex; align-items: center; gap: 15px; height: 100%;",
+  tags$a(
+    href = "https://kodaqs-toolbox.gesis.org/",
+    target = "_blank",
+    tags$img(src = "KODAQS_logo.jpg", height = "40px", style = "height: 36px; width: auto; object-fit: contain;")
+  ), 
+  tags$span("Datcha", style = "font-size: 26px; font-weight: bold;"),
+  tags$a(
+    href = "https://github.com/ECCdigital/gesis-datcha",
+    target = "_blank",
+    icon("github", class = "fa-lg"),
+    style = "color: white; margin-left: 20px; vertical-align: middle; text-decoration: none;"
+  )
+),
+# Fixed footer at the bottom of EVERY page
+tags$footer(class = "app-footer",
+            tags$div(
+              HTML("&copy; 2025 Datcha &nbsp; • &nbsp;"),
+              tags$a(href = "https://www.gesis.org/en/institute/imprint", 
+                     target = "_blank", 
+                     style = "color: #a0d8ff; text-decoration: underline;", 
+                     "Imprint"),
+              HTML(" &nbsp; • &nbsp; "),
+              tags$a(href = "https://www.gesis.org/en/institute/data-protection", 
+                     target = "_blank", 
+                     style = "color: #a0d8ff; text-decoration: underline;", 
+                     "Data Protection")
+            )
+            
+),  # end of ui
+    # Update navbar color and button styles
                  header = tags$style(HTML("
   .navbar { background-color: #1c4474 !important; }
   .navbar-default .navbar-brand { color: white !important; }
@@ -39,6 +70,133 @@ ui <- navbarPage("Datcha",
   color: #fff !important;
 }
 ")),
+                 tags$style(HTML("
+  html {
+    position: relative;
+    min-height: 100%;
+  }
+  body {
+    padding-bottom: 180px;  /* Increased padding to push content down */
+  }
+  .app-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;  /* Adjust to fit your content */
+    background-color: #1c4474;
+    color: white;
+    padding: 15px 0;
+    text-align: center;
+    font-size: 14px;
+  }
+  .shiny-output-error { visibility: hidden; }
+.shiny-output-error:before { content: ' '; visibility: visible; }
+"))
+,
+                 
+                 # <<< PRIVACY BANNER – FIXED VERSION >>>
+tags$style(HTML("
+  #data-privacy-banner {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #1c4474;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 10000;
+    max-width: 380px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  #data-privacy-banner a {
+    color: #a0d8ff;
+    text-decoration: underline;
+  }
+  #data-privacy-banner .close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    float: right;
+    margin-left: 15px;
+    opacity: 0.8;
+  }
+  #data-privacy-banner .close-btn:hover { opacity: 1; }
+")),
+                 # <<< PRIVACY BANNER – FIXED VERSION >>>
+                 div(id = "data-privacy-banner",
+                     # Full banner
+                     div(id = "privacy-full",
+                         style = "position:fixed; bottom:20px; right:20px; background:#1c4474; color:white;
+                padding:20px; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.4);
+                z-index:10000; max-width:380px; font-size:14px; line-height:1.5;",
+                         tags$strong("Your uploaded data is NOT stored on our servers"),
+                         tags$button("×",
+                                     style = "background:none; border:none; color:white; font-size:28px;
+                            cursor:pointer; float:right; margin-left:15px; opacity:0.8;",
+                                     onclick = "Shiny.setInputValue('minimize_banner', Math.random());"),
+                         tags$br(), tags$br(),
+                         "All files exist only in your current browser session and are automatically deleted when you close the tab.",
+                         tags$br(), tags$br(),
+                         tags$a(href = "https://shiny.posit.co/r/articles/build/persistent-data-storage/",
+                                target = "_blank", style = "color:#a0d8ff; text-decoration:underline;",
+                                "Official Shiny article: No persistent storage →")
+                     ),
+                     # Minimized floating button
+                     div(id = "privacy-minimized",
+                         style = "display:none; position:fixed; bottom:25px; right:25px; width:56px; height:56px;
+                background:#1c4474; color:white; border-radius:50%; box-shadow:0 4px 15px rgba(0,0,0,0.4);
+                z-index:10000; cursor:pointer; text-align:center; line-height:56px; font-size:24px;",
+                         onclick = "Shiny.setInputValue('expand_banner', Math.random());",
+                         "i")
+                 ),
+
+# tags$head(
+#   tags$style(HTML("
+#   /* LDAvis container styling - prevent footer overlap */
+#   #ldavis_output,
+#   #ldavis_output_addition,
+#   #ldavis_output_editing {
+#     overflow: hidden !important;
+#     min-height: 500px !important;
+#     height: calc(100vh - 200px) !important; /* Adjust based on your layout */
+#     width: 100% !important;
+#     margin-bottom: 40px !important;
+#     border: 1px solid #ddd;
+#     border-radius: 8px;
+#     position: relative;
+#   }
+# 
+#   /* Ensure LDAvis iframe stays within bounds */
+#   #ldavis_output iframe,
+#   #ldavis_output_addition iframe,
+#   #ldavis_output_editing iframe {
+#     width: 100% !important;
+#     height: 100% !important;
+#     min-height: 500px !important;
+#     max-height: calc(100vh - 250px) !important; /* Account for footer */
+#     border: none !important;
+#     position: relative !important;
+#   }
+# 
+#   /* Container wrappers for topic modeling tabs */
+#   #data_deletion_tabs .tab-content,
+#   #data_addition .tab-content {
+#     position: relative;
+#     padding-bottom: 20px;
+#   }
+#   
+#   /* Specific override for Topic Modeling tab panels */
+#   #data_deletion_tabs [data-value='Topic Modeling'] .tab-pane,
+#   #data_addition [data-value='Topic Modeling'] .tab-pane {
+#     padding-bottom: 50px !important; /* Extra padding to avoid footer */
+#   }
+# "))
+# ),
                  # 0. Overview Page
                  tabPanel("Overview",
                           fluidPage(
@@ -59,7 +217,9 @@ ui <- navbarPage("Datcha",
                .dataset-stats { background-color: #e8f1ff; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #1c4474; }
                .dataset-stats p { margin: 5px 0; font-weight: bold; }
               .fluid-page { position: relative; min-height: 100vh; }
-               ")),           
+               ")),   
+                  
+              tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"),
                            
                    tags$script(HTML('
                $(window).on("resize", function() {
@@ -85,18 +245,71 @@ ui <- navbarPage("Datcha",
                               sidebarPanel(
                                 width = 4,
                                 h4("Dataset Comparison"),
+                                # === Dataset 1 ===
                                 fluidRow(
-                                  column(12, fileInput("file1", "Dataset 1 (.csv)", accept = ".csv")),
-                                  column(6, textInput("id_col_1", "ID Column (optional)", placeholder = "e.g. 'id' or 'tweet_id'")),
-                                  column(6, dateInput("date1", "Collection Date for Dataset 1", value = Sys.Date()-30))
+                                  column(12, 
+                                         tags$strong("Dataset 1 (.csv)"),
+                                         tags$span(style="color:red;", "*"),
+                                         fileInput("file1", NULL, accept = ".csv")
+                                  ),
+                                  column(12,
+                                         checkboxInput("gdpr1",
+                                                       tags$span(
+                                                         tags$span(style="color:red;", "*"),
+                                                         " I confirm Dataset 1 is fully GDPR-compliant ",
+                                                         tags$i(class = "fa fa-info-circle", style = "color:#1c4474; cursor:pointer;",
+                                                                title = "Click for details",
+                                                                onclick = "Shiny.setInputValue('show_gdpr_info', Math.random());")
+                                                       ),
+                                                       value = FALSE
+                                         ),
+                                         conditionalPanel(
+                                           condition = "!input.gdpr1",
+                                           tags$div(style = "color: red; font-size: 90%; margin-top: -10px;",
+                                                    "This confirmation is required to proceed.")
+                                         )
+                                  ),
+                                  column(6, 
+                                         textInput("id_col_1", "ID Column (optional)", placeholder = "e.g. 'id' or 'tweet_id'")
+                                  ),
+                                  column(6, 
+                                         dateInput("date1", "Collection Date for Dataset 1 *", value = Sys.Date()-30)
+                                  )
                                 ),
                                 uiOutput("id_validation_msg_1"),
                                 uiOutput("date_validation_msg_1"),
                                 hr(),
+                                
+                                # === Dataset 2 ===
                                 fluidRow(
-                                  column(12, fileInput("file2", "Dataset 2 (.csv)", accept = ".csv")),
-                                  column(6, textInput("id_col_2", "ID Column (optional)", placeholder = "e.g. 'id' or 'tweet_id'")),
-                                  column(6, dateInput("date2", "Collection Date for Dataset 2", value = Sys.Date()))
+                                  column(12, 
+                                         tags$strong("Dataset 2 (.csv)"),
+                                         tags$span(style="color:red;", "*"),
+                                         fileInput("file2", NULL, accept = ".csv")
+                                  ),
+                                  column(12,
+                                         checkboxInput("gdpr2",
+                                                       tags$span(
+                                                         tags$span(style="color:red;", "*"),
+                                                         " I confirm Dataset 2 is fully GDPR-compliant ",
+                                                         tags$i(class = "fa fa-info-circle", style = "color:#1c4474; cursor:pointer;",
+                                                                title = "Click for details",
+                                                                onclick = "Shiny.setInputValue('show_gdpr_info', Math.random());")
+                                                       ),
+                                                       value = FALSE
+                                         ),
+                                         conditionalPanel(
+                                           condition = "input.gdpr1 && !input.gdpr2",
+                                           tags$div(style = "color: red; font-size: 90%; margin-top: -10px;",
+                                                    "This confirmation is required to enable comparison.")
+                                         )
+                                  ),
+                                  column(6, 
+                                         textInput("id_col_2", "ID Column (optional)", placeholder = "e.g. 'id' or 'tweet_id'")
+                                  ),
+                                  column(6, 
+                                         dateInput("date2", "Collection Date for Dataset 2 *", value = Sys.Date())
+                                  )
                                 ),
                                 uiOutput("id_validation_msg_2"),
                                 uiOutput("date_validation_msg_2"),
@@ -110,16 +323,20 @@ ui <- navbarPage("Datcha",
                                   column(6,
                                          h4("How to Use Datcha:"),
                                          tags$ol(
-                                           tags$li("Upload your two datasets above and set their collection dates"),
+                                           tags$li("Upload your two datasets below and set their collection dates"),
+                                           tags$li("Confirm that your datasets are GDPR-compliant. Click the ", tags$i(class = "fa fa-info-circle", style = "color:#1c4474;"), " button next to each checkbox to learn more."),
+                                           tags$li("If your ID column is not one of 'id', 'tweet_id', 'comment_id', 'post_id', or 'status_id', enter the correct name manually in the 'ID Column' field."),
+                                           tags$li("Upload Dataset 1 first, then Dataset 2 (it becomes enabled after Dataset 1 is valid)."),
                                            tags$li("Click 'Compare Datasets' to analyze the data"),
                                            tags$li("Navigate to the different tabs to explore specific analyses:"),
                                            tags$ul(
                                              tags$li("Data Deletion: Analyze removed posts"),
                                              tags$li("Data Addition: Identify newly added content"),
-                                             tags$li("Data Edition: View edited posts and text changes")
+                                             tags$li("Data Editing: View edited posts and text changes")
                                            ),
-                                           tags$li("Use the visualizations to understand patterns in your data")
-                                         ),
+tags$li(tags$strong("Your uploaded data is NOT stored on our servers. All files exist only in your current browser session and are automatically deleted when you close the tab."), " Click the ", tags$i("i"), " button in the bottom-right corner for more details.")
+),
+tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modeling, keyness, or sentiment) may take several minutes to complete, depending on data size. The tool works fastest on small or medium sized data sets. For very large datasets, we recommend calculating the indicators in your local environment."),
                                          hr(),
                                          h4("Key Features:"),
                                          tags$ul(
@@ -129,13 +346,8 @@ ui <- navbarPage("Datcha",
                                            tags$li("Calculates data quality metrics"),
                                            tags$li("Visualizes text differences")
                                          ),
-                                         hr(),
-                                         h4("Data Requirements:"),
-                                         p("Please upload CSV files with:"),
-                                         tags$ul(
-                                           tags$li("A column containing unique post IDs"),
-                                           tags$li("A column named 'text' containing the post content")
-                                         )
+                                         #hr(),
+
                                   ),
                                   column(6,
                                          h4("Dataset Overview"),
@@ -145,6 +357,13 @@ ui <- navbarPage("Datcha",
                                              textOutput("removed_count"),
                                              textOutput("overview_added_count"),
                                              textOutput("edited_post_count")
+                                         ),
+                                         hr(),
+                                         h4("Data Requirements:"),
+                                         p("Please upload CSV files with:"),
+                                         tags$ul(
+                                           tags$li("A column containing unique post IDs"),
+                                           tags$li("A column named 'text' containing the post content")
                                          )
                                   )
                                 )
@@ -161,10 +380,6 @@ ui <- navbarPage("Datcha",
                  width = 3,
                  h4("Summary Statistics"),
                  uiOutput("deletion_quality_indicators"),
-                 # div(style = "margin-bottom: 20px;",
-                 #     uiOutput("deletion_quality_indicators")
-                 # ),
-                 hr(),
                  
                  # Topic Modeling Controls (only visible when Topic Modeling tab is active)
                  conditionalPanel(
@@ -265,7 +480,7 @@ ui <- navbarPage("Datcha",
                conditionalPanel(
                  condition = "input.data_addition == 'Topic Modeling'",
                  div(class = "topic-controls",
-                     h4("Topic Controls (Addition)"),
+                     h4("Topic Controls"),
                      sliderInput("num_topics_addition", "Number of Topics:", 
                                  min = 2, max = 10, value = 5, step = 1),
                      radioButtons("topic_dataset_addition", "Show Topics For:",
@@ -653,6 +868,41 @@ ui <- navbarPage("Datcha",
              h3("Conclusion"),
              p("Datcha provides a comprehensive tool for analyzing social media dataset changes over time. Its modular design and interactive visualizations make it suitable for researchers and analysts studying post dynamics. Future improvements could include support for additional file formats, enhanced performance for large datasets, and more advanced text analysis techniques.")
            )
-  )
-) #navbarPage
+  ),
+  # # <<< REPLACE YOUR CURRENT BANNER WITH THIS ENTIRE BLOCK >>>
+  # div(id = "data-privacy-banner",
+  #     style = "display:none;",
+  #     
+  #     # Full banner (shown when expanded)
+  #     div(id = "privacy-full",
+  #         style = "position:fixed; bottom:20px; right:20px; background:#1c4474; color:white; 
+  #               padding:15px 20px; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.3); 
+  #               z-index:10000; max-width:380px; font-size:14px; line-height:1.5; transition:all 0.3s ease;",
+  #         tags$strong("Your uploaded data is NOT stored"),
+  #         tags$button("×", 
+  #                     style = "background:none; border:none; color:white; font-size:24px; 
+  #                            cursor:pointer; float:right; margin-left:15px; opacity:0.8;",
+  #                     onclick = "Shiny.setInputValue('minimize_banner', Math.random())"),
+  #         tags$br(), tags$br(),
+  #         "All files exist only in your current browser session and are deleted when you close the tab.",
+  #         tags$br(), tags$br(),
+  #         tags$a(href = "https://shiny.posit.co/r/articles/build/persistent-data-storage/", 
+  #                target = "_blank", style = "color:#a0d8ff; text-decoration:underline;",
+  #                "Official Shiny article: No persistent storage")
+  #     ),
+  #     
+  #     # Minimized floating button (shown when collapsed)
+  #     div(id = "privacy-minimized",
+  #         style = "display:none; position:fixed; bottom:25px; right:25px; width:50px; height:50px; 
+  #               background:#1c4474; color:white; border-radius:50%; box-shadow:0 4px 15px rgba(0,0,0,0.3); 
+  #               z-index:10000; cursor:pointer; text-align:center; line-height:50px; font-size:20px;
+  #               transition:all 0.3s ease;",
+  #         onclick = "Shiny.setInputValue('expand_banner', Math.random())",
+  #         "i"
+  #     )
+  # ),
+
+
+)  # this closes the ui object
+
 # End of navbarPage
