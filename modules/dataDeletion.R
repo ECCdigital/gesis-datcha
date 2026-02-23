@@ -245,115 +245,156 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     current_topic(0)  # Clear selection
   })
   
-  # Helper: Create JSON for LDAvis easily
-  topicmodels_json_ldavis <- function(fitted, text_vector, doc_term) {
+  # Helper: Create LDAvis JSON – keeps only documents that survived DTM filtering
+  topicmodels_json_ldavis_safe <- function(fitted, original_texts, dtm) {
     library(dplyr)
     library(stringi)
     
-    phi <- posterior(fitted)$terms %>% as.matrix()
-    theta <- posterior(fitted)$topics %>% as.matrix()
-    vocab <- colnames(phi)
+    # Get indices of documents that survived filtering
+    valid_rows <- which(rowSums(as.matrix(dtm)) > 0)
     
-    doc_length <- sapply(text_vector, function(x) {
-      stri_count(x, regex = "\\S+")
-    })
+    # Subset everything to match the filtered DTM
+    phi    <- posterior(fitted)$terms %>% as.matrix()
+    theta  <- posterior(fitted)$topics[valid_rows, , drop = FALSE]
+    vocab  <- colnames(phi)
     
-    temp_frequency <- as.matrix(doc_term)
-    freq_matrix <- data.frame(ST = colnames(temp_frequency),
-                              Freq = colSums(temp_frequency))
+    cleaned_valid <- original_texts[valid_rows]
+    doc_length <- vapply(cleaned_valid, function(x) stri_count(x, regex = "\\S+"), integer(1))
     
-    # TRY createJSON with cmdscale, fallback to PCA if error
+    term_freq <- colSums(as.matrix(dtm))
+    
     json <- tryCatch({
-      LDAvis::createJSON(phi = phi, theta = theta,
-                          vocab = vocab,
-                          doc.length = doc_length,
-                          term.frequency = freq_matrix$Freq,
-                          mds.method = stats::cmdscale)
+      LDAvis::createJSON(
+        phi = phi,
+        theta = theta,
+        vocab = vocab,
+        doc.length = doc_length,
+        term.frequency = term_freq,
+        mds.method = stats::cmdscale
+      )
     }, error = function(e) {
-      LDAvis::createJSON(phi = phi, theta = theta,
-                          vocab = vocab,
-                          doc.length = doc_length,
-                          term.frequency = freq_matrix$Freq,
-                          mds.method = function(x) { prcomp(x)$x[,1:2] })
+      LDAvis::createJSON(
+        phi = phi,
+        theta = theta,
+        vocab = vocab,
+        doc.length = doc_length,
+        term.frequency = term_freq,
+        mds.method = function(x) prcomp(x)$x[, 1:2]
+      )
     })
     
-    return(json)
+    json
   }
 
+  # ──────────────────────────────────────────────────────────────
+  # In renderUI($ldavis_output) – replace the whole modeling part:
+  # ──────────────────────────────────────────────────────────────
+  
   output$ldavis_output <- renderUI({
     req(comparison_done(), input$num_topics)
     
     dataset_list <- list(
-      "Removed Posts" = removed_posts(),
+      "Removed Posts"   = removed_posts(),
       "Remaining Posts" = remaining_posts(),
-      "Combined View" = bind_rows(
-        removed_posts() %>% mutate(group = "removed"),
+      "Combined View"   = bind_rows(
+        removed_posts()   %>% mutate(group = "removed"),
         remaining_posts() %>% mutate(group = "remaining")
       )
     )
     
     dataset <- dataset_list[[input$topic_dataset]]
     
-    if (nrow(dataset) < 5 || all(dataset$text == "")) {
+    if (nrow(dataset) < 10 || all(dataset$text %in% c("", " ", NA))) {
       return(div(class = "alert alert-warning",
-                 "Not enough text data for topic modeling (minimum 5 documents required)"))
+                 "Not enough meaningful documents for topic modeling (min ~10 non-empty required)"))
     }
     
-    withProgress(message = 'Generating topics...', value = 0.5, {
-      cleaned <- text_processor$clean(dataset$text, use_stem = FALSE, use_lemma = TRUE)
-      corpus <- Corpus(VectorSource(cleaned))
-      dtm <- DocumentTermMatrix(corpus)
-      dtm <- dtm[rowSums(as.matrix(dtm)) > 0, ]
+    withProgress(message = 'Checking dataset size...', value = 0.1, {
       
-      if (nrow(dtm) < 5 || ncol(dtm) < 5) {
-        return(div(class = "alert alert-danger",
-                   "Topic modeling failed - insufficient meaningful text patterns"))
-      }
+      MAX_DOCS_FOR_TOPIC_MODELING <- 15000
       
-      lda_model <- tryCatch({
-        LDA(dtm, k = input$num_topics, control = list(seed = 1234))
-      }, error = function(e) NULL)
-      
-      if (is.null(lda_model)) {
-        return(div(class = "alert alert-danger",
-                   "LDA Model could not be built."))
-      }
-      
-      # Get the LDAvis JSON
-      json <- topicmodels_json_ldavis(lda_model, cleaned, dtm)
-      
-      # Create a container with proper dimensions - INCREASED HEIGHT
-      div(
-        style = "width: 100%; height: 80vh; min-height: 600px; max-height: 900px; 
-           border: 1px solid #ddd; border-radius: 8px; overflow: hidden; 
-           position: relative; background: white; margin-bottom: 20px;",
-        div(
-          id = "ldavis-wrapper-deletion",
-          style = "width: 100%; height: 100%; overflow: auto; position: relative;",
-          LDAvis::renderVis(json),
-          tags$script(HTML("
-  $(document).on('shiny:outputinvalidated.ldavis_output shown.bs.tab', function() {
-    setTimeout(function() {
-      var wrapper = $('#ldavis-wrapper-deletion')[0];
-      if (!wrapper) return;
-      
-      // Remove all but the first slider and controls
-      wrapper.querySelectorAll('input[type=\"range\"]').forEach((el, i) => {
-        if (i > 0) el.closest('div')?.remove();
-      });
-      wrapper.querySelectorAll('.ldavis-control-label').forEach((el, i) => {
-        if (i > 0) el.parentNode?.remove();
-      });
-      wrapper.querySelectorAll('.ldavis-control').forEach((el, i) => {
-        if (i > 0) el.parentNode?.remove();
-      });
-    }, 500);
-  });
-"))
+      if (nrow(dataset) > MAX_DOCS_FOR_TOPIC_MODELING) {
+        view_name <- switch(input$topic_dataset,
+                            "Removed Posts"   = "Removed Posts view",
+                            "Remaining Posts" = "Remaining Posts view",
+                            "Combined View"   = "Combined View (Removed + Remaining)",
+                            "Added Posts"     = "Added Posts view",           # for addition module
+                            "Original Posts"  = "Original Posts view",       # for addition module
+                            input$topic_dataset)  # fallback
+        
+        return(
+          div(class = "alert alert-warning", style = "margin: 20px;",
+              icon("exclamation-triangle"),
+              tags$strong("Topic modeling not available for this view"),
+              tags$p(
+                "The ", strong(view_name), " contains ", nrow(dataset), " posts.",
+                tags$br(),
+                "Topic modeling is limited to ", MAX_DOCS_FOR_TOPIC_MODELING, " documents to avoid long waits and to ensure smooth performance.",
+                tags$br(), tags$br(),
+                # "Try switching to a ",
+                # # if (input$topic_dataset != "Removed Posts")   tags$strong("Removed Posts"),
+                # # if (input$topic_dataset != "Remaining Posts") tags$strong("Remaining Posts"),
+                # # if (input$topic_dataset != "Added Posts")     tags$strong("Added Posts"),
+                # # if (input$topic_dataset != "Original Posts")  tags$strong("Original Posts"),
+                # " view with fewer posts to see topic modeling results.",
+                # tags$br(), tags$br(),
+                
+              )
+          )
         )
-      )
-    })
-  })
+      }
+      
+      # ── Only continue if size is ok ──
+      withProgress(message = 'Generating topics...', value = 0.4, {
+        
+        cleaned <- text_processor$clean(dataset$text, use_stem = FALSE, use_lemma = TRUE)
+        
+        valid_idx <- which(nzchar(trimws(cleaned)))
+        if (length(valid_idx) < 10) {
+          return(div(class = "alert alert-danger",
+                     "After cleaning, too few documents contain any words → topic modeling impossible"))
+        }
+        
+        cleaned_valid <- cleaned[valid_idx]
+        
+        corpus <- Corpus(VectorSource(cleaned_valid))
+        dtm <- DocumentTermMatrix(corpus)
+        dtm <- dtm[rowSums(as.matrix(dtm)) > 0, ]
+        
+        if (nrow(dtm) < 8 || ncol(dtm) < 5) {
+          return(div(class = "alert alert-danger",
+                     "After cleaning & filtering: insufficient terms/documents for LDA"))
+        }
+        
+        lda_model <- tryCatch(
+          LDA(dtm, k = input$num_topics, control = list(seed = 1234)),
+          error = function(e) NULL
+        )
+        
+        if (is.null(lda_model)) {
+          return(div(class = "alert alert-danger", "LDA failed to converge"))
+        }
+        
+        json <- topicmodels_json_ldavis_safe(lda_model, cleaned_valid, dtm)
+        
+        div(
+          style = "width: 100%; height: 80vh; min-height: 650px; max-height: 90vh; 
+                 border: 1px solid #ddd; border-radius: 8px; overflow: auto; 
+                 background: white; margin-bottom: 25px;",
+          
+          div(
+            id = "ldavis-wrapper-deletion",
+            style = "min-width: 1000px; min-height: 800px; padding: 10px; box-sizing: border-box;",
+            LDAvis::renderVis(json)
+          )
+        )
+        
+      })  # closes inner withProgress
+      
+    })    # closes outer withProgress
+    
+  })      # closes renderUI    # ← closes outer withProgress
+  
 
 # ===== Sentiment Analysis ===== #
 get_sentiment_distribution <- function(text_vector) {
