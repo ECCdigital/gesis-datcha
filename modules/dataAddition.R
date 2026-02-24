@@ -665,6 +665,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     phi <- posterior(fitted)$terms %>% as.matrix()
     theta <- posterior(fitted)$topics %>% as.matrix()
     vocab <- colnames(phi)
+
     
     # Get indices of documents that survived in dtm
     valid_rows <- which(rowSums(as.matrix(doc_term)) > 0)
