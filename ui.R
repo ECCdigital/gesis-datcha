@@ -480,7 +480,7 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                conditionalPanel(
                  condition = "input.data_addition == 'Topic Modeling'",
                  div(class = "topic-controls",
-                     h4("Topic Controls (Addition)"),
+                     h4("Topic Controls"),
                      sliderInput("num_topics_addition", "Number of Topics:", 
                                  min = 2, max = 10, value = 5, step = 1),
                      radioButtons("topic_dataset_addition", "Show Topics For:",

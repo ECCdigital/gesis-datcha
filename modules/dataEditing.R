@@ -54,9 +54,22 @@ dataEditingModule <- function(input, output, session, shared_data, detect_id_col
   # Reactive Data Editing Section
   output$data_editing_ui <- renderUI({
     req(comparison_done())
-    tagList(
-      htmlOutput("edit_distance_summary_ui")
-    )
+    
+    if (is.null(edit_distances())) {
+      tags$hr(style = "border-top: 1px solid #1c4474; margin: 20px 0;")
+      # This branch is shown while calculation is running (very short time normally)
+      tagList(
+        div(style = "padding: 30px; text-align: center; color: #1c4474; font-size: 1.1em;",
+            icon("spinner", class = "fa-spin fa-2x"),
+            tags$br(), tags$br(),
+            "Calculating edit distances and text differences... please wait."
+        )
+      )
+    } else {
+      tagList(
+        htmlOutput("edit_distance_summary_ui")
+      )
+    }
   })
 
   # Editing statistics UI
