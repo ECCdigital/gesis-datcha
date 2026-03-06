@@ -34,7 +34,7 @@ tags$footer(class = "app-footer",
             
 ),  # end of ui
     # Update navbar color and button styles
-                 header = tags$style(HTML("
+    header = tags$style(HTML("
   .navbar { background-color: #1c4474 !important; }
   .navbar-default .navbar-brand { color: white !important; }
   .navbar-default .navbar-nav > li > a { color: white !important; }
@@ -334,8 +334,13 @@ tags$style(HTML("
                                              tags$li("Data Addition: Identify newly added content"),
                                              tags$li("Data Editing: View edited posts and text changes")
                                            ),
-tags$li(tags$strong("Your uploaded data is NOT stored on our servers. All files exist only in your current browser session and are automatically deleted when you close the tab."), " Click the ", tags$i("i"), " button in the bottom-right corner for more details.")
-),
+                                           tags$li(tags$strong("Your uploaded data is NOT stored on our servers. All files exist only in your current browser session and are automatically deleted when you close the tab."), " Click the ", tags$i("i"), " button in the bottom-right corner for more details."),
+                                           tags$li(
+                                             tags$strong("If you find any issues or something not working, kindly contact "),
+                                             tags$a(href = "mailto:yannik.peters@gesis.org", tags$strong("Dr Yannik Peters (yannik.peters@gesis.org)")),
+                                             " or ",
+                                             tags$a(href = "mailto:kunjan.shah@gesis.org", tags$strong("Kunjan Shah (kunjan.shah@gesis.org)"))
+                                           )),
 tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modeling, keyness, or sentiment) may take several minutes to complete, depending on data size. The tool works fastest on small or medium sized data sets. For very large datasets, we recommend calculating the indicators in your local environment."),
                                          hr(),
                                          h4("Key Features:"),
@@ -416,7 +421,11 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                               column(12,
                                      uiOutput("keyness_controls"),
                                      highchartOutput("keyness_plot"),
-                                     uiOutput("keyness_interpretation")
+                                     uiOutput("keyness_interpretation"),
+                                     uiOutput("keyness_alert_deletion"),
+                                     #hr(),
+                                     #h5("DEBUG: Why is Keyness empty?"),
+                                     #verbatimTextOutput("keyness_debug_output")
                               )
                             )
                    ),
@@ -501,10 +510,18 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                  id = "data_addition",
                  tabPanel("Word Frequency", 
                           fluidRow(
-                            column(6, h4("Added Posts"), highchartOutput("word_freq_plot_added")),
-                            column(6, h4("Original Posts"), highchartOutput("word_freq_plot_original"))
-                          )
-                 ),
+                            column(6,
+                                   h4("Added Posts"),
+                                   highchartOutput("word_freq_plot_added", height = "450px"),
+                                   uiOutput("word_freq_added_alert")            # ← added
+                            ),
+                            column(6,
+                                   h4("Original Posts"),
+                                   highchartOutput("word_freq_plot_original", height = "450px"),
+                                   uiOutput("word_freq_original_alert")         # ← added
+                            )
+                          
+                 )),
                  tabPanel("Keyness Analysis",
                           fluidRow(
                             column(12,
@@ -515,7 +532,11 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                                      tabPanel("Combined View", value = "combined")
                                    ),
                                    highchartOutput("keyness_plot_addition"),
-                                   uiOutput("keyness_interpretation_addition")
+                                   uiOutput("keyness_interpretation_addition"),
+                                   uiOutput("keyness_alert_addition")
+                                   # hr(),
+                                   # h5("DEBUG: Why is Keyness working here?"),
+                                   # verbatimTextOutput("keyness_debug_output_addition")
                             )
                           )
                  ),
