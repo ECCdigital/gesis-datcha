@@ -32,16 +32,16 @@ tags$footer(class = "app-footer",
                      "Data Protection")
             )
             
-),  # end of ui
-    # Update navbar color and button styles
-    header = tags$style(HTML("
-  .navbar { background-color: #1c4474 !important; }
-  .navbar-default .navbar-brand { color: white !important; }
-  .navbar-default .navbar-nav > li > a { color: white !important; }
-  .navbar-default .navbar-nav > .active > a { background-color: #0f2a4a !important; color: white !important; }
-  .btn-primary { background-color: #1c4474; border-color: #1a3e6b; }
-  .btn-primary:hover { background-color: #1c4474; border-color: #1a3e6b; }
-  
+),  
+  # Update navbar color and button styles
+  header = tags$style(HTML("
+.navbar { background-color: #1c4474 !important; }
+.navbar-default .navbar-brand { color: white !important; }
+.navbar-default .navbar-nav > li > a { color: white !important; }
+.navbar-default .navbar-nav > .active > a { background-color: #0f2a4a !important; color: white !important; }
+.btn-primary { background-color: #1c4474; border-color: #1a3e6b; }
+.btn-primary:hover { background-color: #1c4474; border-color: #1a3e6b; }
+
 /* only style plain default buttons */
 .btn.btn-default:not(.btn-primary) {
   background-color: #a02b93;
@@ -69,8 +69,15 @@ tags$footer(class = "app-footer",
   border-color: #1a3e6b !important;
   color: #fff !important;
 }
+
+/* ── Hide empty / phantom navbar tab items ──────────────────────── */
+  .nav.navbar-nav > li > a[href^='#tab-'][data-toggle='tab']:empty,
+  .nav.navbar-nav > li > a[data-bs-toggle='tab']:empty,
+  .nav.navbar-nav > li:has(> a:empty) {
+    display: none !important;
+}
 ")),
-                 tags$style(HTML("
+tags$style(HTML("
   html {
     position: relative;
     min-height: 100%;
@@ -92,117 +99,57 @@ tags$footer(class = "app-footer",
   }
   .shiny-output-error { visibility: hidden; }
 .shiny-output-error:before { content: ' '; visibility: visible; }
-"))
-,
-                 
-                 # <<< PRIVACY BANNER – FIXED VERSION >>>
-tags$style(HTML("
-  #data-privacy-banner {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: #1c4474;
-    color: white;
-    padding: 15px 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    z-index: 10000;
-    max-width: 380px;
-    font-size: 14px;
-    line-height: 1.5;
-  }
-  #data-privacy-banner a {
-    color: #a0d8ff;
-    text-decoration: underline;
-  }
-  #data-privacy-banner .close-btn {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 20px;
-    cursor: pointer;
-    float: right;
-    margin-left: 15px;
-    opacity: 0.8;
-  }
-  #data-privacy-banner .close-btn:hover { opacity: 1; }
 ")),
-                 # <<< PRIVACY BANNER – FIXED VERSION >>>
-                 div(id = "data-privacy-banner",
-                     # Full banner
-                     div(id = "privacy-full",
-                         style = "position:fixed; bottom:20px; right:20px; background:#1c4474; color:white;
-                padding:20px; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.4);
-                z-index:10000; max-width:380px; font-size:14px; line-height:1.5;",
-                         tags$strong("Your uploaded data is NOT stored on our servers"),
-                         tags$button("×",
-                                     style = "background:none; border:none; color:white; font-size:28px;
-                            cursor:pointer; float:right; margin-left:15px; opacity:0.8;",
-                                     onclick = "Shiny.setInputValue('minimize_banner', Math.random());"),
-                         tags$br(), tags$br(),
-                         "All files exist only in your current browser session and are automatically deleted when you close the tab.",
-                         tags$br(), tags$br(),
-                         tags$a(href = "https://shiny.posit.co/r/articles/build/persistent-data-storage/",
-                                target = "_blank", style = "color:#a0d8ff; text-decoration:underline;",
-                                "Official Shiny article: No persistent storage →")
-                     ),
-                     # Minimized floating button
-                     div(id = "privacy-minimized",
-                         style = "display:none; position:fixed; bottom:25px; right:25px; width:56px; height:56px;
-                background:#1c4474; color:white; border-radius:50%; box-shadow:0 4px 15px rgba(0,0,0,0.4);
-                z-index:10000; cursor:pointer; text-align:center; line-height:56px; font-size:24px;",
-                         onclick = "Shiny.setInputValue('expand_banner', Math.random());",
-                         "i")
-                 ),
 
-# tags$head(
-#   tags$style(HTML("
-#   /* LDAvis container styling - prevent footer overlap */
-#   #ldavis_output,
-#   #ldavis_output_addition,
-#   #ldavis_output_editing {
-#     overflow: hidden !important;
-#     min-height: 500px !important;
-#     height: calc(100vh - 200px) !important; /* Adjust based on your layout */
-#     width: 100% !important;
-#     margin-bottom: 40px !important;
-#     border: 1px solid #ddd;
-#     border-radius: 8px;
-#     position: relative;
-#   }
-# 
-#   /* Ensure LDAvis iframe stays within bounds */
-#   #ldavis_output iframe,
-#   #ldavis_output_addition iframe,
-#   #ldavis_output_editing iframe {
-#     width: 100% !important;
-#     height: 100% !important;
-#     min-height: 500px !important;
-#     max-height: calc(100vh - 250px) !important; /* Account for footer */
-#     border: none !important;
-#     position: relative !important;
-#   }
-# 
-#   /* Container wrappers for topic modeling tabs */
-#   #data_deletion_tabs .tab-content,
-#   #data_addition .tab-content {
-#     position: relative;
-#     padding-bottom: 20px;
-#   }
-#   
-#   /* Specific override for Topic Modeling tab panels */
-#   #data_deletion_tabs [data-value='Topic Modeling'] .tab-pane,
-#   #data_addition [data-value='Topic Modeling'] .tab-pane {
-#     padding-bottom: 50px !important; /* Extra padding to avoid footer */
-#   }
-# "))
-# ),
-                 # 0. Overview Page
-                 tabPanel("Overview",
-                          fluidPage(
-                            useShinyjs(), 
-                            tags$head(
-                              tags$style(HTML("
+# ── PRIVACY BANNER (floating bottom-right corner) ────────────────────────────────
+div(
+  id = "data-privacy-banner",
+  
+  # Full expanded view
+  div(
+    id = "privacy-full",
+    style = "position: fixed; bottom: 20px; right: 20px; 
+             background: #1c4474; color: white; 
+             padding: 16px 20px; border-radius: 10px; 
+             box-shadow: 0 5px 18px rgba(0,0,0,0.35); 
+             z-index: 9999; max-width: 380px; font-size: 14px; line-height: 1.55;",
+    
+    tags$strong("Your uploaded data is NOT stored on our servers"),
+    tags$button(
+      "×",
+      style = "background:none; border:none; color:white; font-size: 28px; 
+               cursor:pointer; float:right; margin-left: 12px; opacity:0.85;",
+      onclick = "Shiny.setInputValue('minimize_banner', Math.random());"
+    ),
+    tags$br(), tags$br(),
+    "All files exist only in your browser session and are automatically deleted when you close the tab.",
+    tags$br(), tags$br(),
+    tags$a(
+      href = "https://shiny.posit.co/r/articles/build/persistent-data-storage/",
+      target = "_blank", 
+      style = "color:#a0d8ff; text-decoration:underline;",
+      "Official Shiny article: No persistent storage →"
+    )
+  ),
+  
+  # Small floating button when minimized
+  div(
+    id = "privacy-minimized",
+    style = "display: none; position: fixed; bottom: 24px; right: 24px; 
+             width: 56px; height: 56px; background: #1c4474; color: white; 
+             border-radius: 50%; box-shadow: 0 4px 16px rgba(0,0,0,0.4); 
+             z-index: 9999; cursor: pointer; text-align: center; 
+             line-height: 56px; font-size: 24px;",
+    onclick = "Shiny.setInputValue('expand_banner', Math.random());",
+    "i"
+  )
+),
+# 0. Overview Page
+tabPanel("Overview",
+fluidPage(
+useShinyjs(), 
+tags$head(
+tags$style(HTML("
                .form-group, .shiny-input-container { margin-bottom: 8px; }
                .form-group { padding-bottom: 0px; }
                .shiny-date-input { padding-bottom: 0px; margin-bottom: 0px; }
@@ -423,9 +370,12 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                                      highchartOutput("keyness_plot"),
                                      uiOutput("keyness_interpretation"),
                                      uiOutput("keyness_alert_deletion"),
+                                     # In ui.R or the tabPanel("Data Deletion", fluidPage(...))
+                                     uiOutput("keyness_alert_deletion_ui"),
                                      #hr(),
-                                     #h5("DEBUG: Why is Keyness empty?"),
-                                     #verbatimTextOutput("keyness_debug_output")
+                                     # h5("DEBUG: Why is Keyness empty?"),
+                                     # verbatimTextOutput("keyness_debug_output")
+                                     
                               )
                             )
                    ),
@@ -890,39 +840,7 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
              p("Datcha provides a comprehensive tool for analyzing social media dataset changes over time. Its modular design and interactive visualizations make it suitable for researchers and analysts studying post dynamics. Future improvements could include support for additional file formats, enhanced performance for large datasets, and more advanced text analysis techniques.")
            )
   ),
-  # # <<< REPLACE YOUR CURRENT BANNER WITH THIS ENTIRE BLOCK >>>
-  # div(id = "data-privacy-banner",
-  #     style = "display:none;",
-  #     
-  #     # Full banner (shown when expanded)
-  #     div(id = "privacy-full",
-  #         style = "position:fixed; bottom:20px; right:20px; background:#1c4474; color:white; 
-  #               padding:15px 20px; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.3); 
-  #               z-index:10000; max-width:380px; font-size:14px; line-height:1.5; transition:all 0.3s ease;",
-  #         tags$strong("Your uploaded data is NOT stored"),
-  #         tags$button("×", 
-  #                     style = "background:none; border:none; color:white; font-size:24px; 
-  #                            cursor:pointer; float:right; margin-left:15px; opacity:0.8;",
-  #                     onclick = "Shiny.setInputValue('minimize_banner', Math.random())"),
-  #         tags$br(), tags$br(),
-  #         "All files exist only in your current browser session and are deleted when you close the tab.",
-  #         tags$br(), tags$br(),
-  #         tags$a(href = "https://shiny.posit.co/r/articles/build/persistent-data-storage/", 
-  #                target = "_blank", style = "color:#a0d8ff; text-decoration:underline;",
-  #                "Official Shiny article: No persistent storage")
-  #     ),
-  #     
-  #     # Minimized floating button (shown when collapsed)
-  #     div(id = "privacy-minimized",
-  #         style = "display:none; position:fixed; bottom:25px; right:25px; width:50px; height:50px; 
-  #               background:#1c4474; color:white; border-radius:50%; box-shadow:0 4px 15px rgba(0,0,0,0.3); 
-  #               z-index:10000; cursor:pointer; text-align:center; line-height:50px; font-size:20px;
-  #               transition:all 0.3s ease;",
-  #         onclick = "Shiny.setInputValue('expand_banner', Math.random())",
-  #         "i"
-  #     )
-  # ),
-
+  
 
 )  # this closes the ui object
 
