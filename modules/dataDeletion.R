@@ -165,12 +165,44 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
 
     text_data <- removed_posts()$text  # Assumption: The text column is named "text"
 
-    if (is.null(text_data) || length(text_data) == 0) {
-      showNotification("Error: No text data found in removed posts.", type = "error")
-      return(NULL)
+    if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
+      showNotification(
+        "Removed posts: no non-empty text content",
+        type = "warning",
+        duration = NULL,
+        closeButton = TRUE
+      )
+      return(highchart() %>% 
+               hc_title(text = "Removed Posts") %>% 
+               hc_subtitle(text = "No usable text data"))
     }
 
     cleaned_text <- text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
+    
+    # ── Minimal but effective checks ───────────────────────────────────────
+    n_valid_docs   <- sum(nzchar(trimws(cleaned_text)))
+    n_unique_lines <- length(unique(cleaned_text[nzchar(trimws(cleaned_text))]))
+    
+    if (n_valid_docs < 5) {
+      showNotification(
+        "Removed posts: too few documents with content after cleaning (< 5)",
+        type = "warning",
+        duration = NULL,
+        closeButton = TRUE
+      )
+      return(highchart() %>% 
+               hc_title(text = "Removed Posts") %>% 
+               hc_subtitle(text = "Too few valid documents for word analysis"))
+    }
+    
+    if (n_unique_lines <= 3) {
+      showNotification(
+        "Removed posts: very repetitive content detected (few unique texts)",
+        type = "warning",
+        duration = NULL,
+        closeButton = TRUE
+      )}
+    
     word_freq <- text_processor$get_freq(cleaned_text) %>%
       filter(freq > 1) %>%
       slice(1:100)  # Add slicing to match original behavior
@@ -198,13 +230,45 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     rem <- remaining_posts()
     text_data <- rem$text
 
-    if (is.null(text_data) || length(text_data) == 0) {
-      showNotification("Error: No text data found in remaining posts.", type = "error")
-      return(NULL)
+    if (is.null(text_data) || length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
+      showNotification(
+        "Remaining posts: no non-empty text content",
+        type = "warning",
+        duration = NULL,
+        closeButton = TRUE
+      )
+      return(highchart() %>% 
+               hc_title(text = "Remaining Posts") %>% 
+               hc_subtitle(text = "No usable text data"))
     }
 
     # Clean text first
     cleaned_text <- text_processor$clean(text_data,  use_stem = FALSE, use_lemma = TRUE)
+    
+    # ── Minimal but effective checks ───────────────────────────────────────
+    n_valid_docs   <- sum(nzchar(trimws(cleaned_text)))
+    n_unique_lines <- length(unique(cleaned_text[nzchar(trimws(cleaned_text))]))
+    
+    if (n_valid_docs < 5) {
+      showNotification(
+        "Remaining posts: too few documents with content after cleaning (< 5)",
+        type = "warning",
+        duration = NULL,
+        closeButton = TRUE
+      )
+      return(highchart() %>% 
+               hc_title(text = "Remaining Posts") %>% 
+               hc_subtitle(text = "Too few valid documents for word analysis"))
+    }
+    
+    if (n_unique_lines <= 3) {
+      showNotification(
+        "Remaining posts: very repetitive content detected (few unique texts)",
+        type = "warning",
+        duration = NULL,
+        closeButton = TRUE
+      )}
+    
     word_freq <- text_processor$get_freq(cleaned_text) %>%
       filter(freq > 1) %>%
       slice(1:100)
@@ -395,13 +459,13 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     
   })      # closes renderUI    # ← closes outer withProgress
   
-
 # ===== Sentiment Analysis ===== #
 get_sentiment_distribution <- function(text_vector) {
-  if (is.null(text_vector)) {
+  if (length(text_vector) < 5 || all(nzchar(trimws(text_vector)) == 0)) {
+    showNotification("Too few or empty texts → sentiment unreliable", type = "warning")
     return(data.frame(
       category = c("Negative", "Neutral", "Positive"),
-      percentage = c(0, 0, 0)
+      percentage = c(0, 100, 0)  # default to neutral when no info
     ))
   }
   
@@ -415,6 +479,10 @@ get_sentiment_distribution <- function(text_vector) {
   })
   
   all_scores <- unlist(lapply(results, function(x) x$sentiment))
+  
+    if (length(all_scores) >= 5 && sd(all_scores, na.rm = TRUE) < 0.0001) {
+    showNotification("All texts have almost identical sentiment (repetitive data?)", type = "warning")
+    }
   
   category <- cut(all_scores, 
                   breaks = c(-Inf, -0.01, 0.01, Inf),
@@ -459,40 +527,122 @@ get_extreme_posts <- function(df, n = 1, type = "positive") {
 }
 
 # Sentiment distribution plots 
-output$sentiment_plot_removed <- renderHighchart({
+# ── Sentiment data for removed posts ─────────────────────────────────────
+sentiment_data_removed <- reactive({
   req(comparison_done(), removed_posts())
   
-  withProgress(message = 'Analyzing sentiment...', value = 0.5, {
-    sentiment_data <- get_sentiment_distribution(removed_posts()$text)
-  })
+  text_data <- removed_posts()$text
+  if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
+    return(NULL)
+  }
   
-  highchart() %>%
-    hc_chart(type = "column") %>%
-    hc_xAxis(categories = c("Negative", "Neutral", "Positive")) %>%
-    hc_yAxis(title = list(text = "Percentage"), labels = list(format = "{value}%")) %>%
-    hc_add_series(name = "Removed Posts", 
-                  data = sentiment_data$percentage, 
-                  color = "#4CAF50") %>%
-    hc_tooltip(pointFormat = "<b>{point.category}</b>: {point.y:.1f}%") %>%
-    hc_plotOptions(series = list(pointPadding = 0.1, groupPadding = 0.1))
+  scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
+  
+  neg_count <- sum(scores < 0, na.rm = TRUE)
+  neu_count <- sum(scores == 0, na.rm = TRUE)   # adjust range if your neutral is wider
+  pos_count <- sum(scores > 0, na.rm = TRUE)
+  total <- length(scores)
+  
+  if (total == 0) return(NULL)
+  
+  list(
+    pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
+    total = total
+  )
 })
 
-output$sentiment_plot_remaining <- renderHighchart({
+# ── Sentiment data for remaining posts ───────────────────────────────────
+sentiment_data_remaining <- reactive({
   req(comparison_done(), remaining_posts())
   
-  withProgress(message = 'Analyzing sentiment...', value = 0.5, {
-    sentiment_data <- get_sentiment_distribution(remaining_posts()$text)
-  })
+  text_data <- remaining_posts()$text
+  if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
+    return(NULL)
+  }
+  
+  scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
+  
+  neg_count <- sum(scores < 0, na.rm = TRUE)
+  neu_count <- sum(scores == 0, na.rm = TRUE)
+  pos_count <- sum(scores > 0, na.rm = TRUE)
+  total <- length(scores)
+  
+  if (total == 0) return(NULL)
+  
+  list(
+    pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
+    total = total
+  )
+})
+
+# ── Plot: Removed posts sentiment ────────────────────────────────────────
+output$sentiment_plot_removed <- renderHighchart({
+  req(sentiment_data_removed())
+  
+  data <- sentiment_data_removed()
+  pct <- data$pct
+  total <- data$total
+  
+  if (total < 10) {
+    showNotification(
+      "Sentiment analysis on removed posts: Small sample size (<10 posts) — results may not be reliable.",
+      type = "warning"
+    )
+  }
   
   highchart() %>%
     hc_chart(type = "column") %>%
-    hc_xAxis(categories = c("Negative", "Neutral", "Positive")) %>%
-    hc_yAxis(title = list(text = "Percentage"), labels = list(format = "{value}%")) %>%
-    hc_add_series(name = "Remaining Posts", 
-                  data = sentiment_data$percentage, 
-                  color = "#2196F3") %>%
-    hc_tooltip(pointFormat = "<b>{point.category}</b>: {point.y:.1f}%") %>%
-    hc_plotOptions(series = list(pointPadding = 0.1, groupPadding = 0.1))
+    hc_title(text = "Removed Posts Sentiment") %>%
+    hc_subtitle(text = if (total == 0) "No data available" else NULL) %>%
+    hc_xAxis(categories = c("Negative", "Neutral", "Positive"),
+             title = list(text = NULL)) %>%
+    hc_yAxis(title = list(text = "Percentage"),
+             labels = list(format = "{value}%"),
+             min = 0, max = 100) %>%
+    hc_add_series(name = "Removed Posts", data = pct, color = "#4CAF50",
+                  showInLegend = FALSE) %>%
+    hc_plotOptions(column = list(
+      minPointLength = 5,           # ← makes 0% bars visible
+      dataLabels = list(enabled = TRUE, format = "{y:.1f}%", inside = FALSE)
+    )) %>%
+    hc_tooltip(formatter = JS("function() {
+      return '<b>' + this.x + '</b>: ' + this.y.toFixed(1) + '%';
+    }"))
+})
+
+# ── Plot: Remaining posts sentiment ──────────────────────────────────────
+output$sentiment_plot_remaining <- renderHighchart({
+  req(sentiment_data_remaining())
+  
+  data <- sentiment_data_remaining()
+  pct <- data$pct
+  total <- data$total
+  
+  if (total < 10) {
+    showNotification(
+      "Sentiment analysis on remaining posts: Small sample size (<10 posts) — results may not be reliable.",
+      type = "warning"
+    )
+  }
+  
+  highchart() %>%
+    hc_chart(type = "column") %>%
+    hc_title(text = "Remaining Posts Sentiment") %>%
+    hc_subtitle(text = if (total == 0) "No data available" else NULL) %>%
+    hc_xAxis(categories = c("Negative", "Neutral", "Positive"),
+             title = list(text = NULL)) %>%
+    hc_yAxis(title = list(text = "Percentage"),
+             labels = list(format = "{value}%"),
+             min = 0, max = 100) %>%
+    hc_add_series(name = "Remaining Posts", data = pct, color = "#2196F3",
+                  showInLegend = FALSE) %>%
+    hc_plotOptions(column = list(
+      minPointLength = 5,
+      dataLabels = list(enabled = TRUE, format = "{y:.1f}%", inside = FALSE)
+    )) %>%
+    hc_tooltip(formatter = JS("function() {
+      return '<b>' + this.x + '</b>: ' + this.y.toFixed(1) + '%';
+    }"))
 })
 
 # ----- Most Extreme Posts - Dynamic Boxes ----- #
@@ -569,11 +719,15 @@ output$most_negative_remaining_box <- renderUI({
 # ===== Keyness Analysis Module ===== #
 keyness_analyzer <- list(
   prepare_data = function(removed_posts, remaining_posts) {
+    
+    # ── Clean each group only once ──
+    cleaned_removed   <- text_processor$clean(removed_posts$text,   use_stem = FALSE, use_lemma = TRUE)
+    cleaned_remaining <- text_processor$clean(remaining_posts$text, use_stem = FALSE, use_lemma = TRUE)
+    
     combined_df <- data.frame(
-      text = c(text_processor$clean(removed_posts$text), 
-                text_processor$clean(remaining_posts$text)),
-      group = c(rep("removed", nrow(removed_posts)), 
-                rep("remaining", nrow(remaining_posts)))
+      text  = c(cleaned_removed, cleaned_remaining),
+      group = c(rep("removed",   length(cleaned_removed)),
+                rep("remaining", length(cleaned_remaining)))
     )
     
     frequency_table_creator(
@@ -612,12 +766,21 @@ keyness_results <- reactive({
     freq_table <- keyness_analyzer$prepare_data(removed_posts(), remaining_posts())
     measures <- keyness_analyzer$calculate_keyness(freq_table)
     
-    # Helper function for filtering
+    # Overall maxima
+    max_ll_overall <- max(measures$log_likelihood, na.rm = TRUE)
+    max_ell_overall <- max(measures$ell, na.rm = TRUE)
+    
+    # Term with highest log‑likelihood
+    top_term_info <- measures %>%
+      slice_max(log_likelihood, n = 1, with_ties = FALSE) %>%
+      select(word, log_likelihood, ell) %>%
+      as.list()
+    
     filter_terms <- function(use_type, n = 5) {
       measures %>%
         filter(word_use == use_type, 
-                log_likelihood > 3.84) %>%  # Remove ell > 0 condition
-        arrange(desc(log_likelihood)) %>%  # Sort by log_likelihood first
+               log_likelihood > 3.84) %>%
+        arrange(desc(log_likelihood)) %>%
         slice(1:n)
     }
     
@@ -626,10 +789,59 @@ keyness_results <- reactive({
       underuse = filter_terms("underuse"),
       all = measures %>% 
         filter(log_likelihood > 3.84) %>%
-        arrange(desc(ell))
+        arrange(desc(log_likelihood)),
+      max_ll_overall = max_ll_overall,
+      max_ell_overall = max_ell_overall,
+      top_term = top_term_info   # list with elements word, log_likelihood, ell
     )
   })
 })
+
+# === Alert when groups have low keyness values ===
+keyness_alert_deletion <- reactive({
+  req(keyness_results())
+  
+  max_ll <- keyness_results()$max_ll_overall
+  max_ell <- keyness_results()$max_ell_overall
+  top <- keyness_results()$top_term
+  
+  if (max_ll < 3.84) {
+    paste0("⚠️ Keyness analysis limited: All terms have log‑likelihood below 3.84. ",
+           "Highest term is '", top$word, "' (LL = ", round(top$log_likelihood, 2), 
+           ", ELL = ", round(top$ell, 6), "). No terms meet the significance threshold.")
+  } else if (max_ll < 10) {
+    paste0("⚠️ Low keyness detected: Most distinctive term is '", top$word, 
+           "' (LL = ", round(top$log_likelihood, 2), ", ELL = ", round(top$ell, 6), 
+           "). Terms shown may have weak statistical significance.")
+  } else {
+    NULL
+  }
+})
+# # === DEBUG: Confirm why keyness is empty ===
+# keyness_debug <- reactive({
+#   req(removed_posts(), remaining_posts())
+# 
+#   clean_removed   <- text_processor$clean(removed_posts()$text,   use_stem = FALSE, use_lemma = TRUE)
+#   clean_remaining <- text_processor$clean(remaining_posts()$text, use_stem = FALSE, use_lemma = TRUE)
+# 
+#   freq_removed   <- text_processor$get_freq(clean_removed)   %>% slice_head(n = 10)
+#   freq_remaining <- text_processor$get_freq(clean_remaining) %>% slice_head(n = 10)
+# 
+#   # Get the actual keyness numbers (even the tiny ones)
+#   freq_table <- keyness_analyzer$prepare_data(removed_posts(), remaining_posts())
+#   measures   <- keyness_analyzer$calculate_keyness(freq_table)
+# 
+#   list(
+#     `Unique cleaned texts - Removed`   = length(unique(clean_removed)),
+#     `Unique cleaned texts - Remaining` = length(unique(clean_remaining)),
+#     `Top 10 words in Removed`          = freq_removed,
+#     `Top 10 words in Remaining`        = freq_remaining,
+#     `Top 20 Keyness values (ELL)`      = measures %>%
+#       arrange(desc(log_likelihood))%>%
+#       slice_head(n = 20) %>%
+#       select(word, log_likelihood, ell, word_use)
+#   )
+# })
 
 # UI controls remain the same
 output$keyness_controls <- renderUI({
@@ -642,7 +854,6 @@ output$keyness_controls <- renderUI({
     tabPanel("Combined View", value = "combined")
   )
 })
-
 
 # Update the plot to show ELL values
 output$keyness_plot <- renderHighchart({
@@ -768,7 +979,7 @@ output$keyness_interpretation <- renderUI({
       "<p style='margin-top: 10px; font-size: 0.9em; color: #666;'>",
       "These words appear much more often in removed posts than in the remaining ones.<br>",
       "<strong>Example:</strong> If the word 'protest' appears a lot in removed posts but not in remaining ones, it will show up here.<br>",
-      "<strong>LL (Log-likelihood)</strong> tells us how statistically significant the difference is (a value above 3.84 means it's important).<br>",
+      "<strong>LL (Log-likelihood)</strong> tells us how statistically significant the difference is (a value above 3.84 means it's important) <a href='https://ucrel.lancs.ac.uk/llwizard.html' target='_blank'>[1]</a> <a href='https://www.lancaster.ac.uk/fss/courses/ling/corpus/blue/l08_4.htm' target='_blank'>[2]</a>.<br>",
       "<strong>ELL (Effect Size)</strong> shows how strong that difference is (closer to 1 = bigger difference).",
       "</p>",
       "</div>"
@@ -818,13 +1029,22 @@ output$keyness_interpretation <- renderUI({
       "</div>",
       "<p style='margin-top: 10px; font-size: 0.9em; color: #666;'>",
       "This helps you understand which words are more typical in each group.<br>",
-      "LL tells us if it's a meaningful difference (above 3.84 = likely real).<br>",
+      "LL tells us if it's a meaningful difference (above 3.84 = likely real) <a href='https://ucrel.lancs.ac.uk/llwizard.html' target='_blank'>[1]</a> <a href='https://www.lancaster.ac.uk/fss/courses/ling/corpus/blue/l08_4.htm' target='_blank'>[2]</a>.<br>",
       "ELL shows how big the difference is (0 to 1 scale, closer to 1 = bigger).<br>",
       "<strong>Example:</strong> 'banned' might appear more in removed posts, while 'sale' might appear more in remaining posts.",
       "</p>",
       "</div>"
     ))
   }
+})
+
+# output$keyness_debug_output <- renderPrint({
+#   req(keyness_debug())
+#   keyness_debug()
+# })
+
+output$sentiment_alert_deletion <- renderUI({
+  sentiment_similarity_alert()
 })
 
 return(list(
