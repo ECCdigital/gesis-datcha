@@ -125,49 +125,63 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
   })
   
   # ===== Word Frequency Analysis ===== #
+  # ===== Word Frequency – Added Posts =====
   output$word_freq_plot_added <- renderHighchart({
     req(comparison_done(), added_posts())
     
     text_data <- added_posts()$text
     
-    if (is.null(text_data) || length(text_data) == 0 || all(is.na(text_data))) {
-      showNotification("Error: No valid text data found in added posts.", type = "error")
-      return(NULL)
+    # Early exit — very clear feedback
+    if (is.null(text_data) || length(text_data) == 0 || 
+        all(is.na(text_data) | trimws(text_data) == "")) {
+      return(highchart() %>% 
+               hc_title("Added Posts") %>% 
+               hc_subtitle("No non-empty text content available"))
     }
     
-    cleaned_text <- tryCatch({
-      text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
-    }, error = function(e) {
-      showNotification(paste("Error processing text for added posts:", e$message), type = "error")
-      return(NULL)
-    })
+    cleaned_text <- text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
     
-    if (is.null(cleaned_text)) return(NULL)
+    n_valid_docs   <- sum(nzchar(trimws(cleaned_text)))
+    n_unique_lines <- length(unique(cleaned_text[nzchar(trimws(cleaned_text))]))
     
-    word_freq <- tryCatch({
-      text_processor$get_freq(cleaned_text) %>%
-        filter(freq > 1) %>%
-        slice_head(n = 100)
-    }, error = function(e) {
-      showNotification(paste("Error calculating word frequencies for added posts:", e$message), type = "error")
-      return(NULL)
-    })
-    
-    if (is.null(word_freq) || nrow(word_freq) == 0) {
-      showNotification("No valid words found after processing added posts.", type = "warning")
-      return(NULL)
+    if (n_valid_docs < 5) {
+      return(highchart() %>% 
+               hc_title("Added Posts") %>% 
+               hc_subtitle("Too few valid documents after cleaning (< 5)"))
     }
     
+    # if (n_unique_lines <= 3) {
+    #   showNotification(
+    #     "Added posts: very repetitive / near-identical content detected",
+    #     type = "warning",
+    #     duration = 10
+    #   )
+    #   # still try to plot — better than nothing
+    # }
+    
+    word_freq <- text_processor$get_freq(cleaned_text) %>%
+      filter(freq > 1) %>%
+      slice_head(n = 100)
+    
+    if (nrow(word_freq) == 0) {
+      return(highchart() %>% 
+               hc_title("Added Posts") %>% 
+               hc_subtitle("No valid words found after processing"))
+    }
+    
+    # ── Actual plot ────────────────────────────────────────────────────────
     highchart() %>%
       hc_chart(type = "bar") %>%
       hc_title(text = "Added Posts") %>%
       hc_tooltip(crosshairs = TRUE, shared = FALSE, useHTML = TRUE,
                  formatter = JS("function() {
-                                   var result = '<br/><span style=\"color:' + this.series.color + '\">' + this.point.category + '</span>:<b> ' + this.point.y + '</b>';
-                                   return result;
-                 }")) %>%
+                 var result = '<br/><span style=\"color:' + this.series.color + '\">' + 
+                              this.point.category + '</span>:<b> ' + this.point.y + '</b>';
+                 return result;
+               }")) %>%
       hc_xAxis(categories = word_freq$word,
-               labels = list(style = list(fontSize = '11px')), max = 20, scrollbar = list(enabled = TRUE)) %>%
+               labels = list(style = list(fontSize = '11px')), 
+               max = 20, scrollbar = list(enabled = TRUE)) %>%
       hc_add_series(name = "Word", data = word_freq$freq, type = "column",
                     color = "#4CAF50", showInLegend = FALSE)
   })
@@ -177,17 +191,33 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     
     text_data <- original_posts()$text
     
-    if (is.null(text_data) || length(text_data) == 0 || all(is.na(text_data))) {
-      showNotification("Error: No valid text data found in original posts.", type = "error")
-      return(NULL)
-    }
+    # # ── Early & visible failure modes ──────────────────────────────────────
+    # if (is.null(text_data) || length(text_data) == 0 || 
+    #     all(is.na(text_data) | trimws(text_data) == "")) {
+    #   showNotification("Original posts: no non-empty text content available", type = "warning")
+    #   return(highchart() %>% 
+    #            hc_title(text = "Original Posts") %>% 
+    #            hc_subtitle(text = "No usable text data"))
+    # }
     
-    cleaned_text <- tryCatch({
-      text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
-    }, error = function(e) {
-      showNotification(paste("Error processing text for original posts:", e$message), type = "error")
-      return(NULL)
-    })
+    cleaned_text <- text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
+    
+    n_valid_docs   <- sum(nzchar(trimws(cleaned_text)))
+    n_unique_lines <- length(unique(cleaned_text[nzchar(trimws(cleaned_text))]))
+    
+    # if (n_valid_docs < 5) {
+    #   showNotification("Original posts: too few documents with meaningful content after cleaning (< 5)", 
+    #                    type = "warning")
+    #   return(highchart() %>% 
+    #            hc_title(text = "Original Posts") %>% 
+    #            hc_subtitle(text = "Too few valid documents for word analysis"))
+    # }
+    # 
+    # if (n_unique_lines <= 3) {
+    #   showNotification("Original posts: very repetitive / near-identical content detected", 
+    #                    type = "warning", duration = 8)
+    #   # still render → user sees the repetition problem directly
+    # }
     
     if (is.null(cleaned_text)) return(NULL)
     
@@ -200,11 +230,11 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       return(NULL)
     })
     
-    if (is.null(word_freq) || nrow(word_freq) == 0) {
-      showNotification("No valid words found after processing original posts.", type = "warning")
-      return(NULL)
-    }
-    
+    # if (is.null(word_freq) || nrow(word_freq) == 0) {
+    #   showNotification("No valid words found after processing original posts.", type = "warning")
+    #   return(NULL)
+    # }
+    # 
     highchart() %>%
       hc_chart(type = "bar") %>%
       hc_title(text = "Original Posts") %>%
@@ -217,6 +247,60 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
                labels = list(style = list(fontSize = '11px')), max = 20, scrollbar = list(enabled = TRUE)) %>%
       hc_add_series(name = "Word", data = word_freq$freq, type = "column",
                     color = "#2196F3", showInLegend = FALSE)
+  })
+  #outputOptions(output, "word_freq_plot_original", suspendWhenHidden = TRUE)
+  
+  # ── New output for alerts ────────────────────────────────────────────────
+  output$word_freq_added_alert <- renderUI({
+    req(comparison_done(), added_posts())
+    
+    text_data <- added_posts()$text
+    if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
+      return(div(class = "alert alert-warning", icon("exclamation-triangle"),
+                 "No usable text content in added posts."))
+    }
+    
+    cleaned <- text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
+    n_valid <- sum(nzchar(trimws(cleaned)))
+    n_unique <- length(unique(cleaned[nzchar(trimws(cleaned))]))
+    
+    if (n_valid < 5) {
+      return(div(class = "alert alert-warning", icon("exclamation-triangle"),
+                 "Too few documents with meaningful content after cleaning (", n_valid, ")."))
+    }
+    
+    if (n_unique <= 3) {
+      return(div(class = "alert alert-info", icon("info-circle"),
+                 "Very low text diversity in added posts — most texts are near-identical or repetitive."))
+    }
+    
+    NULL  # no message needed
+  })
+  
+  output$word_freq_original_alert <- renderUI({
+    req(comparison_done(), original_posts())
+    
+    text_data <- original_posts()$text
+    if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
+      return(div(class = "alert alert-warning", icon("exclamation-triangle"),
+                 "No usable text content in original posts."))
+    }
+    
+    cleaned <- text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
+    n_valid <- sum(nzchar(trimws(cleaned)))
+    n_unique <- length(unique(cleaned[nzchar(trimws(cleaned))]))
+    
+    if (n_valid < 5) {
+      return(div(class = "alert alert-warning", icon("exclamation-triangle"),
+                 "Too few documents with meaningful content after cleaning (", n_valid, ")."))
+    }
+    
+    if (n_unique <= 3) {
+      return(div(class = "alert alert-info", icon("info-circle"),
+                 "Very low text diversity in original posts — most texts are near-identical or repetitive."))
+    }
+    
+    NULL
   })
   
   # ===== Keyness Analysis Module ===== #
@@ -265,6 +349,14 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       freq_table <- keyness_analyzer_addition$prepare_data(added_posts(), original_posts())
       measures <- keyness_analyzer_addition$calculate_keyness(freq_table)
       
+      max_ll_overall <- max(measures$log_likelihood, na.rm = TRUE)
+      max_ell_overall <- max(measures$ell, na.rm = TRUE)
+      
+      top_term_info <- measures %>%
+        slice_max(log_likelihood, n = 1, with_ties = FALSE) %>%
+        select(word, log_likelihood, ell) %>%
+        as.list()
+      
       filter_terms <- function(use_type, n = 5) {
         measures %>%
           filter(word_use == use_type, 
@@ -278,10 +370,58 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         underuse = filter_terms("underuse"),
         all = measures %>% 
           filter(log_likelihood > 3.84) %>%
-          arrange(desc(ell))
+          arrange(desc(ell)),
+        max_ll_overall = max_ll_overall,
+        max_ell_overall = max_ell_overall,
+        top_term = top_term_info
       )
     })
   })
+  
+  # === Alert when groups have low keyness values ===
+  keyness_alert_addition <- reactive({
+    req(keyness_results_addition())
+    
+    max_ll <- keyness_results_addition()$max_ll_overall
+    max_ell <- keyness_results_addition()$max_ell_overall
+    top <- keyness_results_addition()$top_term
+    
+    if (max_ll < 3.84) {
+      paste0("⚠️ Keyness analysis limited: All terms have log‑likelihood below 3.84. ",
+             "Highest term is '", top$word, "' (LL = ", round(top$log_likelihood, 2), 
+             ", ELL = ", round(top$ell, 6), "). No terms meet the significance threshold.")
+    } else if (max_ll < 10) {
+      paste0("⚠️ Low keyness detected: Most distinctive term is '", top$word, 
+             "' (LL = ", round(top$log_likelihood, 2), ", ELL = ", round(top$ell, 6), 
+             "). Terms shown may have weak statistical significance.")
+    } else {
+      NULL
+    }
+  })
+  
+  # # === DEBUG: Why keyness works here ===
+  # keyness_debug_addition <- reactive({
+  #   req(added_posts(), original_posts())
+  #   
+  #   clean_added    <- text_processor$clean(added_posts()$text,    use_stem = FALSE, use_lemma = TRUE)
+  #   clean_original <- text_processor$clean(original_posts()$text, use_stem = FALSE, use_lemma = TRUE)
+  #   
+  #   freq_added    <- text_processor$get_freq(clean_added)    %>% slice_head(n = 10)
+  #   freq_original <- text_processor$get_freq(clean_original) %>% slice_head(n = 10)
+  #   
+  #   freq_table <- keyness_analyzer_addition$prepare_data(added_posts(), original_posts())
+  #   measures   <- keyness_analyzer_addition$calculate_keyness(freq_table)
+  #   
+  #   list(
+  #     `Unique cleaned texts - Added`     = length(unique(clean_added)),
+  #     `Unique cleaned texts - Original`  = length(unique(clean_original)),
+  #     `Top 10 words in Added`            = freq_added,
+  #     `Top 10 words in Original`         = freq_original,
+  #     `Top 20 Keyness values (ELL)`      = measures %>% 
+  #       slice_head(n = 20) %>% 
+  #       select(word, log_likelihood, ell, word_use)
+  #   )
+  # })
   
   # Render keyness plot
   output$keyness_plot_addition <- renderHighchart({
@@ -527,41 +667,127 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
   }
   
   # Sentiment distribution plots for added and original posts
-  output$sentiment_plot_added <- renderHighchart({
+  # Helper reactive for added sentiment data (add this if not already present)
+  sentiment_data_added <- reactive({
     req(comparison_done(), added_posts())
     
-    withProgress(message = 'Analyzing sentiment...', value = 0.5, {
-      sentiment_data <- get_sentiment_distribution(added_posts()$text)
-    })
+    text_data <- added_posts()$text
+    if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
+      return(NULL)  # Edge case: no usable text
+    }
+    
+    scores <- sentimentr::sentiment_by(text_data)$ave_sentiment  # Assuming ave_sentiment; adjust if using raw sentence-level
+    
+    # Bin sentiments (adjust thresholds if needed, e.g., neutral as -0.05 < score < 0.05)
+    neg_count <- sum(scores < 0, na.rm = TRUE)
+    neu_count <- sum(scores == 0, na.rm = TRUE)  # Or sum(abs(scores) < 0.05)
+    pos_count <- sum(scores > 0, na.rm = TRUE)
+    total <- length(scores)
+    
+    if (total == 0) return(NULL)
+    
+    list(
+      pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
+      total = total
+    )
+  })
+  
+  # Updated render for added sentiment plot
+  output$sentiment_plot_added <- renderHighchart({
+    req(sentiment_data_added())
+    
+    data <- sentiment_data_added()
+    pct <- data$pct
+    total <- data$total
+    
+    # Edge case: very small dataset warning (optional, but good for UX)
+    if (total < 10) {
+      showNotification("Sentiment analysis on added posts: Small sample size (<10 posts) may not be reliable.", type = "warning")
+    }
     
     highchart() %>%
       hc_chart(type = "column") %>%
-      hc_xAxis(categories = c("Negative", "Neutral", "Positive")) %>%
-      hc_yAxis(title = list(text = "Percentage"), labels = list(format = "{value}%")) %>%
-      hc_add_series(name = "Added Posts", 
-                    data = sentiment_data$percentage, 
-                    color = "#4CAF50") %>%
-      hc_tooltip(pointFormat = "<b>{point.category}</b>: {point.y:.1f}%") %>%
-      hc_plotOptions(series = list(pointPadding = 0.1, groupPadding = 0.1))
+      hc_title(text = "Added Posts Sentiment") %>%
+      hc_subtitle(text = if (total == 0) "No data available" else NULL) %>%
+      hc_xAxis(categories = c("Negative", "Neutral", "Positive"),
+               title = list(text = NULL)) %>%
+      hc_yAxis(title = list(text = "Percentage"),
+               labels = list(format = "{value}%"),
+               min = 0, max = 100) %>%
+      hc_add_series(name = "Added Posts", data = pct, color = "#4CAF50",
+                    showInLegend = FALSE) %>%
+      hc_plotOptions(column = list(
+        minPointLength = 5,  # Makes zero bars visible as thin lines
+        dataLabels = list(enabled = TRUE, format = "{y:.1f}%", inside = FALSE)
+      )) %>%
+      hc_tooltip(formatter = JS("function() {
+      return '<b>' + this.x + '</b>: ' + this.y.toFixed(1) + '%';
+    }"))
+  })
+  
+  # Similarly for original (symmetric fix)
+  sentiment_data_original <- reactive({
+    req(comparison_done(), original_posts())
+    
+    text_data <- original_posts()$text
+    if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
+      return(NULL)
+    }
+    
+    scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
+    
+    neg_count <- sum(scores < 0, na.rm = TRUE)
+    neu_count <- sum(scores == 0, na.rm = TRUE)
+    pos_count <- sum(scores > 0, na.rm = TRUE)
+    total <- length(scores)
+    
+    if (total == 0) return(NULL)
+    
+    list(
+      pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
+      total = total
+    )
   })
   
   output$sentiment_plot_original <- renderHighchart({
-    req(comparison_done(), original_posts())
+    req(sentiment_data_original())
     
-    withProgress(message = 'Analyzing sentiment...', value = 0.5, {
-      sentiment_data <- get_sentiment_distribution(original_posts()$text)
-    })
+    data <- sentiment_data_original()
+    pct <- data$pct
+    total <- data$total
+    
+    if (total < 10) {
+      showNotification("Sentiment analysis on original posts: Small sample size (<10 posts) may not be reliable.", type = "warning")
+    }
     
     highchart() %>%
       hc_chart(type = "column") %>%
-      hc_xAxis(categories = c("Negative", "Neutral", "Positive")) %>%
-      hc_yAxis(title = list(text = "Percentage"), labels = list(format = "{value}%")) %>%
-      hc_add_series(name = "Original Posts", 
-                    data = sentiment_data$percentage, 
-                    color = "#2196F3") %>%
-      hc_tooltip(pointFormat = "<b>{point.category}</b>: {point.y:.1f}%") %>%
-      hc_plotOptions(series = list(pointPadding = 0.1, groupPadding = 0.1))
+      hc_title(text = "Original Posts Sentiment") %>%
+      hc_subtitle(text = if (total == 0) "No data available" else NULL) %>%
+      hc_xAxis(categories = c("Negative", "Neutral", "Positive"),
+               title = list(text = NULL)) %>%
+      hc_yAxis(title = list(text = "Percentage"),
+               labels = list(format = "{value}%"),
+               min = 0, max = 100) %>%
+      hc_add_series(name = "Original Posts", data = pct, color = "#2196F3",
+                    showInLegend = FALSE) %>%
+      hc_plotOptions(column = list(
+        minPointLength = 5,
+        dataLabels = list(enabled = TRUE, format = "{y:.1f}%", inside = FALSE)
+      )) %>%
+      hc_tooltip(formatter = JS("function() {
+      return '<b>' + this.x + '</b>: ' + this.y.toFixed(1) + '%';
+    }"))
   })
+  
+  # # Inside dataAdditionModule, after comparison_done()
+  # observe({
+  #   req(added_posts())
+  #   scores <- sentimentr::get_sentiment(added_posts()$text)
+  #   print(summary(scores))
+  #   print(table(cut(scores, breaks = c(-Inf, -0.05, 0.05, Inf), 
+  #                   labels = c("Negative", "Neutral", "Positive"))))
+  # })
   
   # Reactive expressions for most extreme posts
   most_positive_added_text <- reactive({
@@ -887,7 +1113,17 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
   })      # closes renderUI
   
   # Update the return statement to include current_topic_addition (unchanged from your code):
+  # output$keyness_debug_output_addition <- renderPrint({
+  #   req(keyness_debug_addition())
+  #   keyness_debug_addition()
+  # })
   
+  output$keyness_alert_addition <- renderUI({
+    msg <- keyness_alert_addition()
+    if (!is.null(msg)) {
+      div(class = "alert alert-warning", icon("info-circle"), msg)
+    }
+  })
   return(list(
     added_posts = added_posts,
     original_posts = original_posts,
