@@ -545,7 +545,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         "<p style='margin-top: 10px; font-size: 0.9em; color: #666;'>",
         "These words appear much more often in added posts than in the original ones.<br>",
         "<strong>Example:</strong> If the word 'new' appears a lot in added posts but not in original ones, it will show up here.<br>",
-        "<strong>LL (Log-likelihood)</strong> tells us how statistically significant the difference is (a value above 3.84 means it's important).<br>",
+        "<strong>LL (Log-likelihood)</strong> tells us how statistically significant the difference is (a value above 3.84 means it's important) <a href='https://ucrel.lancs.ac.uk/llwizard.html' target='_blank'>[1]</a> <a href='https://www.lancaster.ac.uk/fss/courses/ling/corpus/blue/l08_4.htm' target='_blank'>[2]</a>.<br>",
         "<strong>ELL (Effect Size)</strong> shows how strong that difference is (closer to 1 = bigger difference).",
         "</p>",
         "</div>"
