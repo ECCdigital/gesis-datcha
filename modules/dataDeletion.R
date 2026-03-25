@@ -375,7 +375,7 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     
     withProgress(message = 'Checking dataset size...', value = 0.1, {
       
-      MAX_DOCS_FOR_TOPIC_MODELING <- 15000
+      MAX_DOCS_FOR_TOPIC_MODELING <- 8000
       
       if (nrow(dataset) > MAX_DOCS_FOR_TOPIC_MODELING) {
         view_name <- switch(input$topic_dataset,
@@ -796,78 +796,82 @@ keyness_results <- reactive({
   })
 })
 
+# ===== FIXED & IMPROVED Keyness Alert for Data Deletion =====
 keyness_alert_deletion <- reactive({
   req(keyness_results(), input$keyness_tabs)
   
-  overuse <- keyness_results()$overuse
-  underuse <- keyness_results()$underuse
-  all_terms <- keyness_results()$all
-  measures <- keyness_results()$raw_measures
-  
-  n_removed <- nrow(removed_posts())
+  results <- keyness_results()
+  n_removed   <- nrow(removed_posts())
   n_remaining <- nrow(remaining_posts())
   
+  # Helper function - now properly receives group sizes
   get_alert <- function(max_ll, max_ell, top_term, view_name) {
     if (max_ll < 3.84) {
-      paste0("⚠️ Keyness analysis limited in ", view_name, ": All terms have log‑likelihood below 3.84. ",
-             "Highest term is '", top_term$word, "' (LL = ", round(top_term$log_likelihood, 2),
-             ", ELL = ", round(top_term$ell, 6), "). No terms meet the significance threshold. ",
-             "(Group sizes: Removed=", n_removed, ", Remaining=", n_remaining, ")")
+      paste0(
+        "⚠️ Keyness analysis limited in ", view_name, ": ",
+        "All terms have log-likelihood below 3.84. ",
+        "Highest term is '", top_term$word, "' (LL = ", round(top_term$log_likelihood, 2),
+        ", ELL = ", round(top_term$ell, 6), "). ",
+        "No terms meet the statistical significance threshold (p < 0.05). ",
+        "(Group sizes: Removed = ", n_removed, ", Remaining = ", n_remaining, ")"
+      )
+      
     } else if (max_ll < 10) {
-      paste0("⚠️ Low keyness detected in ", view_name, ": Most distinctive term is '", top_term$word,
-             "' (LL = ", round(top_term$log_likelihood, 2), ", ELL = ", round(top_term$ell, 6),
-             "). Terms shown may have weak statistical significance. ",
-             "(Group sizes: Removed=", n_removed, ", Remaining=", n_remaining, ")")
+      paste0(
+        "⚠️ Low keyness detected in ", view_name, ": ",
+        "Most distinctive term is '", top_term$word, "' (LL = ", round(top_term$log_likelihood, 2),
+        ", ELL = ", round(top_term$ell, 6), "). ",
+        "Although some terms are technically significant, the differences appear weak in practice. ",
+        "Interpret results with caution. ",
+        "(Group sizes: Removed = ", n_removed, ", Remaining = ", n_remaining, ")"
+      )
+      
     } else {
-      NULL
+      NULL   # No alert needed
     }
   }
   
+  # Determine which tab is active
   if (input$keyness_tabs == "removed") {
-    if (nrow(overuse) > 0) {
-      max_ll <- max(overuse$log_likelihood, na.rm = TRUE)
-      max_ell <- max(overuse$ell, na.rm = TRUE)
-      top <- overuse %>% slice_max(log_likelihood, n = 1, with_ties = FALSE) %>% select(word, log_likelihood, ell)
+    if (nrow(results$overuse) > 0) {
+      top <- results$overuse %>% 
+        slice_max(log_likelihood, n = 1, with_ties = FALSE) %>% 
+        select(word, log_likelihood, ell)
+      max_ll  <- top$log_likelihood
+      max_ell <- top$ell
     } else {
-      raw_overuse <- measures %>% filter(word_use == "overuse") %>% arrange(desc(log_likelihood)) %>% slice(1:5)
-      if (nrow(raw_overuse) == 0) {
-        return("No terms available for Removed Posts.")
-      }
-      max_ll <- max(raw_overuse$log_likelihood, na.rm = TRUE)
-      max_ell <- max(raw_overuse$ell, na.rm = TRUE)
-      top <- raw_overuse %>% slice(1) %>% select(word, log_likelihood, ell)
+      # fallback
+      top <- results$all %>% slice_max(log_likelihood, n = 1, with_ties = FALSE)
+      max_ll  <- ifelse(nrow(top) > 0, top$log_likelihood, 0)
+      max_ell <- ifelse(nrow(top) > 0, top$ell, 0)
     }
     get_alert(max_ll, max_ell, top, "Removed Posts")
     
   } else if (input$keyness_tabs == "remaining") {
-    if (nrow(underuse) > 0) {
-      max_ll <- max(underuse$log_likelihood, na.rm = TRUE)
-      max_ell <- max(underuse$ell, na.rm = TRUE)
-      top <- underuse %>% slice_max(log_likelihood, n = 1, with_ties = FALSE) %>% select(word, log_likelihood, ell)
+    if (nrow(results$underuse) > 0) {
+      top <- results$underuse %>% 
+        slice_max(log_likelihood, n = 1, with_ties = FALSE) %>% 
+        select(word, log_likelihood, ell)
+      max_ll  <- top$log_likelihood
+      max_ell <- top$ell
     } else {
-      raw_underuse <- measures %>% filter(word_use == "underuse") %>% arrange(desc(log_likelihood)) %>% slice(1:5)
-      if (nrow(raw_underuse) == 0) {
-        return("No terms available for Remaining Posts.")
-      }
-      max_ll <- max(raw_underuse$log_likelihood, na.rm = TRUE)
-      max_ell <- max(raw_underuse$ell, na.rm = TRUE)
-      top <- raw_underuse %>% slice(1) %>% select(word, log_likelihood, ell)
+      top <- results$all %>% slice_max(log_likelihood, n = 1, with_ties = FALSE)
+      max_ll  <- ifelse(nrow(top) > 0, top$log_likelihood, 0)
+      max_ell <- ifelse(nrow(top) > 0, top$ell, 0)
     }
     get_alert(max_ll, max_ell, top, "Remaining Posts")
     
-  } else {  # combined
-    if (nrow(all_terms) > 0) {
-      max_ll <- keyness_results()$max_ll_overall
-      max_ell <- keyness_results()$max_ell_overall
-      top <- all_terms %>% slice_max(log_likelihood, n = 1, with_ties = FALSE) %>% select(word, log_likelihood, ell)
+  } else {  # combined view
+    if (nrow(results$all) > 0) {
+      top <- results$all %>% 
+        slice_max(log_likelihood, n = 1, with_ties = FALSE) %>% 
+        select(word, log_likelihood, ell)
+      max_ll  <- results$max_ll_overall
+      max_ell <- results$max_ell_overall
     } else {
-      raw_all <- measures %>% arrange(desc(log_likelihood)) %>% slice(1:5)
-      if (nrow(raw_all) == 0) {
-        return("No terms available in Combined View.")
-      }
-      max_ll <- max(raw_all$log_likelihood, na.rm = TRUE)
-      max_ell <- max(raw_all$ell, na.rm = TRUE)
-      top <- raw_all %>% slice(1) %>% select(word, log_likelihood, ell)
+      top <- tibble(word = "—", log_likelihood = 0, ell = 0)
+      max_ll  <- 0
+      max_ell <- 0
     }
     get_alert(max_ll, max_ell, top, "Combined View")
   }
@@ -1102,7 +1106,7 @@ output$keyness_interpretation <- renderUI({
 output$keyness_alert_deletion_ui <- renderUI({
   msg <- keyness_alert_deletion()
   if (!is.null(msg)) {
-    div(class = "alert alert-warning", style = "margin: 20px 0;", icon("exclamation-triangle"), msg)
+    div(class = "alert alert-warning", icon("info-circle"), msg)
   }
 })
 
