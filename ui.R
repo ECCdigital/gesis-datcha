@@ -20,7 +20,7 @@ title = div(
 # Fixed footer at the bottom of EVERY page
 tags$footer(class = "app-footer",
             tags$div(
-              HTML("&copy; 2025 Datcha &nbsp; • &nbsp;"),
+              HTML(paste0("&copy; ", format(Sys.Date(), "%Y"), " Datcha &nbsp; • &nbsp;")),
               tags$a(href = "https://www.gesis.org/en/institute/imprint", 
                      target = "_blank", 
                      style = "color: #a0d8ff; text-decoration: underline;", 
