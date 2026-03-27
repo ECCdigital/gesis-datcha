@@ -25,6 +25,9 @@ library(diffobj)        # For visual text diffs
 library(htmltools)      # HTML tools for Shiny
 library(bslib)          # Bootstrap library for Shiny
 
+# Configuration constants
+MAX_DOCS_FOR_TOPIC_MODELING <- 15000
+
 # ====================== #
 # 2. TEXT PROCESSING MODULE
 # ====================== #
