@@ -34,15 +34,22 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     id2 <- detect_id_column(df2, input$id_col_2)
     if (is.null(id1) || is.null(id2)) {
       showNotification("No valid ID column found in one or both datasets.", type = "error")
-      return(NULL)
+      return(data.frame(text = character(0), cleaned_text = character(0), stringsAsFactors = FALSE))
     }
     if (!"text" %in% names(df2)) {
       showNotification("Error: 'text' column not found in Dataset 2.", type = "error")
-      return(NULL)
+      return(data.frame(text = character(0), cleaned_text = character(0), stringsAsFactors = FALSE))
     }
-    df2 %>% filter(!( !!sym(id2) %in% df1[[id1]] ))
+    df <- df2 %>% filter(!(!!sym(id2) %in% df1[[id1]]))
+    
+    df$cleaned_text <- if (nrow(df) > 0) {
+      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+    } else {
+      character(0)
+    }
+    df
   })
-  #added_count <- nrow(added_posts())
+ 
   
   # Data Addition Indicators
   output$addition_quality_indicators <- renderUI({
@@ -87,14 +94,21 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     id2 <- detect_id_column(df2, input$id_col_2)
     if (is.null(id1) || is.null(id2)) {
       showNotification("No valid ID column found in one or both datasets.", type = "error")
-      return(NULL)
+      return(data.frame(text = character(0), cleaned_text = character(0), stringsAsFactors = FALSE))
     }
     if (!"text" %in% names(df2)) {
       showNotification("Error: 'text' column not found in Dataset 2.", type = "error")
-      return(NULL)
+      return(data.frame(text = character(0), cleaned_text = character(0), stringsAsFactors = FALSE))
     }
-    df2 %>% filter( !!sym(id2) %in% df1[[id1]] )
-  })
+    df <- df2 %>% filter(!!sym(id2) %in% df1[[id1]])  # ← ADD THIS
+    
+    df$cleaned_text <- if (nrow(df) > 0) {
+      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+    } else {
+      character(0)
+    }
+    df
+})
   
   # Calculate the number of posts in Dataset 1
   output$dataset1_count_addition <- renderText({
@@ -142,7 +156,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         )
       }
       
-      cleaned_text <- text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
+      cleaned_text <- added_posts()$cleaned_text
       
       n_valid_docs   <- sum(nzchar(trimws(cleaned_text)))
       n_unique_lines <- length(unique(cleaned_text[nzchar(trimws(cleaned_text))]))
@@ -196,16 +210,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     
     text_data <- original_posts()$text
     
-    # # ── Early & visible failure modes ──────────────────────────────────────
-    # if (is.null(text_data) || length(text_data) == 0 || 
-    #     all(is.na(text_data) | trimws(text_data) == "")) {
-    #   showNotification("Original posts: no non-empty text content available", type = "warning")
-    #   return(highchart() %>% 
-    #            hc_title(text = "Original Posts") %>% 
-    #            hc_subtitle(text = "No usable text data"))
-    # }
-    
-    cleaned_text <- text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
+    cleaned_text <- original_posts()$cleaned_text
     
     n_valid_docs   <- sum(nzchar(trimws(cleaned_text)))
     n_unique_lines <- length(unique(cleaned_text[nzchar(trimws(cleaned_text))]))
@@ -265,7 +270,8 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
                  "No usable text content in added posts."))
     }
     
-    cleaned <- text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
+    cleaned <- added_posts()$cleaned_text
+    
     n_valid <- sum(nzchar(trimws(cleaned)))
     n_unique <- length(unique(cleaned[nzchar(trimws(cleaned))]))
     
@@ -291,7 +297,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
                  "No usable text content in original posts."))
     }
     
-    cleaned <- text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
+    cleaned <- original_posts()$cleaned_text
     n_valid <- sum(nzchar(trimws(cleaned)))
     n_unique <- length(unique(cleaned[nzchar(trimws(cleaned))]))
     
@@ -325,15 +331,13 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         # Still create a valid (empty) added group so frequency_table_creator doesn't crash
         added_clean <- character(0)
       } else {
-        added_clean <- text_processor$clean(added_posts$text, 
-                                            use_stem = FALSE, use_lemma = TRUE)
+        added_clean <- added_posts$cleaned_text
       }
       
       if (n_original == 0) {
         original_clean <- character(0)
       } else {
-        original_clean <- text_processor$clean(original_posts$text, 
-                                               use_stem = FALSE, use_lemma = TRUE)
+        original_clean <- original_posts$cleaned_text
       }
       
       combined_df <- data.frame(
@@ -1089,7 +1093,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     }
     
     # ── Your existing diversity check (fixed the "texts" typo → now uses text_vec) ──
-    cleaned_sample <- head(text_processor$clean(text_vec, use_stem = FALSE, use_lemma = TRUE), 500)
+    cleaned_sample <- head(dataset$cleaned_text, 500)
     cleaned_sample <- cleaned_sample[nzchar(cleaned_sample)]
     n_unique_clean <- length(unique(cleaned_sample))
     
@@ -1133,8 +1137,9 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       
       withProgress(message = 'Generating topics...', value = 0.5, {
         
-        cleaned <- text_processor$clean(dataset$text, use_stem = FALSE, use_lemma = TRUE)
+        cleaned <- dataset$cleaned_text   # ← pre-cached (works for Added, Original and Combined View)        valid_docs <- which    (cleaned != "" & !is.na(cleaned))
         valid_docs <- which(cleaned != "" & !is.na(cleaned))
+        
         if (length(valid_docs) < 5) {
           return(div(class = "alert alert-warning",
                      "After preprocessing, fewer than 5 valid documents remain for topic modeling"))
@@ -1199,12 +1204,6 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       })
     })
   })
-  
-  # Update the return statement to include current_topic_addition (unchanged from your code):
-  # output$keyness_debug_output_addition <- renderPrint({
-  #   req(keyness_debug_addition())
-  #   keyness_debug_addition()
-  # })
   
   # Keyness alert
   output$keyness_alert_addition <- renderUI({
