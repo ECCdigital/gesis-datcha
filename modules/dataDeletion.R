@@ -124,9 +124,17 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     id2 <- detect_id_column(df2, input$id_col_2)
     if (is.null(id1) || is.null(id2)) {
       showNotification("No valid ID column found in one or both datasets.", type = "error")
-      return(NULL)
+      return(data.frame(text = character(0), cleaned_text = character(0), stringsAsFactors = FALSE))
     }
-    df1 %>% filter(!( !!sym(id1) %in% df2[[id2]] ))
+    df <- df1 %>% filter(!( !!sym(id1) %in% df2[[id2]] ))
+    
+    # === CENTRAL CACHE: clean once ===
+    df$cleaned_text <- if (nrow(df) > 0) {
+      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+    } else {
+      character(0)
+    }
+    df
   })
 
   # Get remaining posts
@@ -135,14 +143,26 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     df1 <- data1(); df2 <- data2()
     id1 <- detect_id_column(df1, input$id_col_1)
     id2 <- detect_id_column(df2, input$id_col_2)
-    if (is.null(id1) || is.null(id2)) return(NULL)
-    df1 %>% filter( !!sym(id1) %in% df2[[id2]] )
+    if (is.null(id1) || is.null(id2)) {
+      return(data.frame(text = character(0), cleaned_text = character(0), stringsAsFactors = FALSE))
+    }
+    df <- df1 %>% filter( !!sym(id1) %in% df2[[id2]] )
+    
+    # === CENTRAL CACHE: clean once ===
+    df$cleaned_text <- if (nrow(df) > 0) {
+      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+    } else {
+      character(0)
+    }
+    df
   })
 
   # Display the number of removed posts
   output$removed_count <- renderText({
-    req(comparison_done(), removed_posts())
-    paste("Number of Deleted Posts:", nrow(removed_posts()))
+    req(comparison_done())
+    posts <- removed_posts()
+    n <- if (is.null(posts) || nrow(posts) == 0) 0 else nrow(posts)
+    paste("Number of Deleted Posts:", n)
   })
 
   # Calculate completeness
@@ -177,7 +197,7 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
                hc_subtitle(text = "No usable text data"))
     }
 
-    cleaned_text <- text_processor$clean(text_data, use_stem = FALSE, use_lemma = TRUE)
+    cleaned_text <- removed_posts()$cleaned_text
     
     # ── Minimal but effective checks ───────────────────────────────────────
     n_valid_docs   <- sum(nzchar(trimws(cleaned_text)))
@@ -243,7 +263,7 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     }
 
     # Clean text first
-    cleaned_text <- text_processor$clean(text_data,  use_stem = FALSE, use_lemma = TRUE)
+    cleaned_text <- remaining_posts()$cleaned_text
     
     # ── Minimal but effective checks ───────────────────────────────────────
     n_valid_docs   <- sum(nzchar(trimws(cleaned_text)))
@@ -411,7 +431,7 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
       # ── Only continue if size is ok ──
       withProgress(message = 'Generating topics...', value = 0.4, {
         
-        cleaned <- text_processor$clean(dataset$text, use_stem = FALSE, use_lemma = TRUE)
+        cleaned <- dataset$cleaned_text   # ← pre-cached
         
         valid_idx <- which(nzchar(trimws(cleaned)))
         if (length(valid_idx) < 10) {
@@ -720,9 +740,9 @@ output$most_negative_remaining_box <- renderUI({
 keyness_analyzer <- list(
   prepare_data = function(removed_posts, remaining_posts) {
     
-    # ── Clean each group only once ──
-    cleaned_removed   <- text_processor$clean(removed_posts$text,   use_stem = FALSE, use_lemma = TRUE)
-    cleaned_remaining <- text_processor$clean(remaining_posts$text, use_stem = FALSE, use_lemma = TRUE)
+    
+    cleaned_removed   <- removed_posts$cleaned_text     # ← was clean() call
+    cleaned_remaining <- remaining_posts$cleaned_text   # ← was clean() call
     
     combined_df <- data.frame(
       text  = c(cleaned_removed, cleaned_remaining),
