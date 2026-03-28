@@ -12,6 +12,29 @@ source("modules/dataEditing.R")
 # 2. Define server
 server <- function(input, output, session) {
   
+  # Initialize shared reactive values  ← MOVED FROM global.R
+  shared_data <- reactiveValues(
+    data1 = NULL,
+    data2 = NULL,
+    edit_distances = NULL,
+    comparison_done = FALSE,
+    file1_uploaded = FALSE,
+    file2_uploaded = FALSE
+  )
+  
+  # GDPR compliance enforcement  ← MOVED FROM global.R
+  observe({
+    if (!isTRUE(input$gdpr1)) {
+      shinyjs::disable("file2")
+      shinyjs::disable("compare")
+      updateCheckboxInput(session, "gdpr2", value = FALSE)
+    } else if (!isTRUE(input$gdpr2)) {
+      shinyjs::disable("compare")
+    } else if (shared_data$file1_uploaded && shared_data$file2_uploaded) {
+      shinyjs::enable("compare")
+    }
+  })
+  
   # GDPR Info Modal
   observeEvent(input$show_gdpr_info, {
     showModal(modalDialog(
@@ -69,7 +92,7 @@ server <- function(input, output, session) {
   # === END BANNER ===
   
   # Call common data handler from global.R
-  shared_data <- common_data_handler(input, output, session)
+  common_data_handler(input, output, session, shared_data)
   
   # Call modules with shared data
   deletion_results <- dataDeletionModule(input, output, session, shared_data, detect_id_column)

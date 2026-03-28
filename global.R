@@ -33,7 +33,8 @@ MAX_DOCS_FOR_TOPIC_MODELING <- 15000
 # ====================== #
 text_processor = list(
   clean = function(text, use_stem = FALSE, use_lemma = FALSE) {
-    corpus = Corpus(VectorSource(text)) %>%
+    corpus = VCorpus(VectorSource(text)) %>%
+    #corpus = Corpus(VectorSource(text)) %>%
       tm_map(content_transformer(tolower)) %>%
       tm_map(removeNumbers) %>%
       tm_map(removePunctuation) %>%
@@ -59,7 +60,10 @@ text_processor = list(
     if (gram_type == "Uni-gram") {
       corpus <- Corpus(VectorSource(text))
       dtm <- DocumentTermMatrix(corpus)
-      freq <- colSums(as.matrix(dtm))
+      
+      # Use sparse-aware col_sums instead of as.matrix()
+      freq <- slam::col_sums(dtm)
+      
       data.frame(word = names(freq), freq = freq) %>% 
         arrange(desc(freq))
     } else {
@@ -76,27 +80,27 @@ text_processor = list(
 # ====================== #
 
 # Initialize shared reactive values
-shared_data <- reactiveValues(
-  data1 = NULL,
-  data2 = NULL,
-  edit_distances = NULL,
-  comparison_done = FALSE,
-  file1_uploaded = FALSE,
-  file2_uploaded = FALSE
-)
-
-# === GDPR COMPLIANCE ENFORCEMENT ===
-observe({
-  if (!isTRUE(input$gdpr1)) {
-    shinyjs::disable("file2")
-    shinyjs::disable("compare")
-    updateCheckboxInput(session, "gdpr2", value = FALSE)
-  } else if (!isTRUE(input$gdpr2)) {
-    shinyjs::disable("compare")
-  } else if (shared_data$file1_uploaded && shared_data$file2_uploaded) {
-    shinyjs::enable("compare")
-  }
-})
+# shared_data <- reactiveValues(
+#   data1 = NULL,
+#   data2 = NULL,
+#   edit_distances = NULL,
+#   comparison_done = FALSE,
+#   file1_uploaded = FALSE,
+#   file2_uploaded = FALSE
+# )
+# 
+# # === GDPR COMPLIANCE ENFORCEMENT ===
+# observe({
+#   if (!isTRUE(input$gdpr1)) {
+#     shinyjs::disable("file2")
+#     shinyjs::disable("compare")
+#     updateCheckboxInput(session, "gdpr2", value = FALSE)
+#   } else if (!isTRUE(input$gdpr2)) {
+#     shinyjs::disable("compare")
+#   } else if (shared_data$file1_uploaded && shared_data$file2_uploaded) {
+#     shinyjs::enable("compare")
+#   }
+# })
 
 # Function to detect the correct ID column
 detect_id_column <- function(df, manual_name = NULL) {
@@ -110,7 +114,7 @@ detect_id_column <- function(df, manual_name = NULL) {
 }
 
 # Common dataset handling logic
-common_data_handler <- function(input, output, session) {
+common_data_handler <- function(input, output, session, shared_data) {
   # Disable Dataset 2 upload and Compare button initially
   observe({
     shinyjs::disable("file2")
@@ -126,7 +130,6 @@ common_data_handler <- function(input, output, session) {
       updateCheckboxInput(session, "gdpr2", value = FALSE)  # optional reset
     }
   })
-  
   
   # Handle Dataset 1 upload and ID validation
   observeEvent(input$file1, {
