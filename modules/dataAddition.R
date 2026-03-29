@@ -787,31 +787,33 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
   # ── Safe sentiment data for Added Posts (no more warning) ─────────────────────
   sentiment_data_added <- reactive({
     req(comparison_done(), added_posts())
-    
+
     tryCatch({
       text_data <- added_posts()$text
       if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
         return(NULL)
       }
-      
-      # This line eliminates the annoying sentimentr warning forever
-      sentences <- get_sentences(text_data)
-      
-      scores <- sentiment_by(sentences)$ave_sentiment
-      
+
+      chunk_size <- 200
+      chunks <- split(text_data, ceiling(seq_along(text_data) / chunk_size))
+
+      scores <- unlist(lapply(chunks, function(chunk) {
+        sentimentr::sentiment_by(chunk)$ave_sentiment
+      }))
+
       neg_count <- sum(scores < 0, na.rm = TRUE)
-      neu_count <- sum(abs(scores) < 0.01, na.rm = TRUE)   # neutral zone
+      neu_count <- sum(abs(scores) < 0.01, na.rm = TRUE)
       pos_count <- sum(scores > 0, na.rm = TRUE)
-      total     <- length(scores)
-      
+      total <- length(scores)
+
       if (total == 0) return(NULL)
-      
+
       list(
-        pct   = c(neg_count/total*100, neu_count/total*100, pos_count/total*100),
+        pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
         total = total
       )
     }, error = function(e) {
-      NULL   # graceful fallback
+      NULL
     })
   })
   
@@ -851,21 +853,26 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
   # Similarly for original (symmetric fix)
   sentiment_data_original <- reactive({
     req(comparison_done(), original_posts())
-    
+
     text_data <- original_posts()$text
     if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
       return(NULL)
     }
-    
-    scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
-    
+
+    chunk_size <- 200
+    chunks <- split(text_data, ceiling(seq_along(text_data) / chunk_size))
+
+    scores <- unlist(lapply(chunks, function(chunk) {
+      sentimentr::sentiment_by(chunk)$ave_sentiment
+    }))
+
     neg_count <- sum(scores < 0, na.rm = TRUE)
     neu_count <- sum(scores == 0, na.rm = TRUE)
     pos_count <- sum(scores > 0, na.rm = TRUE)
     total <- length(scores)
-    
+
     if (total == 0) return(NULL)
-    
+
     list(
       pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
       total = total

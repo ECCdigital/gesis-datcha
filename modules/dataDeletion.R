@@ -548,52 +548,62 @@ get_extreme_posts <- function(df, n = 1, type = "positive") {
 
 # Sentiment distribution plots 
 # ── Sentiment data for removed posts ─────────────────────────────────────
-sentiment_data_removed <- reactive({
-  req(comparison_done(), removed_posts())
-  
-  text_data <- removed_posts()$text
-  if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
-    return(NULL)
-  }
-  
-  scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
-  
-  neg_count <- sum(scores < 0, na.rm = TRUE)
-  neu_count <- sum(scores == 0, na.rm = TRUE)   # adjust range if your neutral is wider
-  pos_count <- sum(scores > 0, na.rm = TRUE)
-  total <- length(scores)
-  
-  if (total == 0) return(NULL)
-  
-  list(
-    pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
-    total = total
-  )
-})
+  sentiment_data_removed <- reactive({
+    req(comparison_done(), removed_posts())
+
+    text_data <- removed_posts()$text
+    if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
+      return(NULL)
+    }
+
+    chunk_size <- 200
+    chunks <- split(text_data, ceiling(seq_along(text_data) / chunk_size))
+
+    scores <- unlist(lapply(chunks, function(chunk) {
+      sentimentr::sentiment_by(chunk)$ave_sentiment
+    }))
+
+    neg_count <- sum(scores < 0, na.rm = TRUE)
+    neu_count <- sum(scores == 0, na.rm = TRUE)
+    pos_count <- sum(scores > 0, na.rm = TRUE)
+    total <- length(scores)
+
+    if (total == 0) return(NULL)
+
+    list(
+      pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
+      total = total
+    )
+  })
 
 # ── Sentiment data for remaining posts ───────────────────────────────────
-sentiment_data_remaining <- reactive({
-  req(comparison_done(), remaining_posts())
-  
-  text_data <- remaining_posts()$text
-  if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
-    return(NULL)
-  }
-  
-  scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
-  
-  neg_count <- sum(scores < 0, na.rm = TRUE)
-  neu_count <- sum(scores == 0, na.rm = TRUE)
-  pos_count <- sum(scores > 0, na.rm = TRUE)
-  total <- length(scores)
-  
-  if (total == 0) return(NULL)
-  
-  list(
-    pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
-    total = total
-  )
-})
+  sentiment_data_remaining <- reactive({
+    req(comparison_done(), remaining_posts())
+
+    text_data <- remaining_posts()$text
+    if (length(text_data) == 0 || all(is.na(text_data) | trimws(text_data) == "")) {
+      return(NULL)
+    }
+
+    chunk_size <- 200
+    chunks <- split(text_data, ceiling(seq_along(text_data) / chunk_size))
+
+    scores <- unlist(lapply(chunks, function(chunk) {
+      sentimentr::sentiment_by(chunk)$ave_sentiment
+    }))
+
+    neg_count <- sum(scores < 0, na.rm = TRUE)
+    neu_count <- sum(scores == 0, na.rm = TRUE)
+    pos_count <- sum(scores > 0, na.rm = TRUE)
+    total <- length(scores)
+
+    if (total == 0) return(NULL)
+
+    list(
+      pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
+      total = total
+    )
+  })
 
 # ── Plot: Removed posts sentiment ────────────────────────────────────────
 output$sentiment_plot_removed <- renderHighchart({
