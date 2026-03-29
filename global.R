@@ -33,27 +33,40 @@ MAX_DOCS_FOR_TOPIC_MODELING <- 15000
 # ====================== #
 text_processor = list(
   clean = function(text, use_stem = FALSE, use_lemma = FALSE) {
+    # ── Chunked processing für Memory-Safety ──
+    MAX_CHUNK <- 5000
+
+    if (length(text) > MAX_CHUNK) {
+      chunks <- split(text, ceiling(seq_along(text) / MAX_CHUNK))
+      results <- lapply(chunks, function(chunk) {
+        text_processor$clean(chunk, use_stem, use_lemma)
+      })
+      return(unlist(results))
+    }
+
     corpus = VCorpus(VectorSource(text)) %>%
-    #corpus = Corpus(VectorSource(text)) %>%
       tm_map(content_transformer(tolower)) %>%
       tm_map(removeNumbers) %>%
       tm_map(removePunctuation) %>%
       tm_map(removeWords, stopwords(source = "smart")) %>%
       tm_map(stripWhitespace)
-    
-    # Apply stemming if requested
+
     if(use_stem) {
       corpus <- tm_map(corpus, stemDocument)
     }
-    
-    # Apply lemmatization if requested
+
     if(use_lemma) {
       text_vec <- sapply(corpus, as.character)
+      # Chunked lemmatization
       text_vec <- lemmatize_strings(text_vec)
+      # Explizit Corpus freigeben
+      rm(corpus); gc()
       return(text_vec)
     }
-    
-    sapply(corpus, as.character)
+
+    result <- sapply(corpus, as.character)
+    rm(corpus); gc()
+    result
   },
   
   get_freq = function(text, gram_type = "Uni-gram") {

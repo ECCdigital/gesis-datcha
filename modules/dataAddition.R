@@ -354,7 +354,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         remove_punct = TRUE,
         remove_symbols = TRUE,
         remove_numbers = TRUE,
-        lemmatize = TRUE
+        lemmatize = FALSE
       )
     },
     

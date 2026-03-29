@@ -768,7 +768,7 @@ keyness_analyzer <- list(
       remove_punct = TRUE,
       remove_symbols = TRUE,
       remove_numbers = TRUE,
-      lemmatize = TRUE
+      lemmatize = FALSE
     )
   },
   
