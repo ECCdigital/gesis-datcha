@@ -1016,7 +1016,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     vocab <- colnames(phi)
     
     # Get indices of documents that survived in dtm
-    valid_rows <- which(rowSums(as.matrix(doc_term)) > 0)
+    valid_rows <- which(slam::row_sums(doc_term) > 0)
     
     # Subset theta and text_vector to match the filtered dtm
     theta <- theta[valid_rows, , drop = FALSE]
@@ -1026,7 +1026,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     doc_length <- vapply(text_vector_filtered, function(x) stri_count(x, regex = "\\S+"), integer(1))
     
     # Term frequencies from the filtered dtm
-    term_freq <- colSums(as.matrix(doc_term))
+    term_freq <- slam::col_sums(doc_term)
     
     json <- tryCatch({
       LDAvis::createJSON(
@@ -1148,7 +1148,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         cleaned <- cleaned[valid_docs]
         corpus <- Corpus(VectorSource(cleaned))
         dtm <- DocumentTermMatrix(corpus)
-        dtm <- dtm[rowSums(as.matrix(dtm)) > 0, ]
+        dtm <- dtm[slam::row_sums(dtm) > 0, ]
         
         if (nrow(dtm) < 5 || ncol(dtm) < 5) {
           return(div(class = "alert alert-danger",

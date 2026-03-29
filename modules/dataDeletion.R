@@ -335,7 +335,7 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     library(stringi)
     
     # Get indices of documents that survived filtering
-    valid_rows <- which(rowSums(as.matrix(dtm)) > 0)
+    valid_rows <- which(slam::row_sums(dtm) > 0)
     
     # Subset everything to match the filtered DTM
     phi    <- posterior(fitted)$terms %>% as.matrix()
@@ -345,7 +345,7 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     cleaned_valid <- original_texts[valid_rows]
     doc_length <- vapply(cleaned_valid, function(x) stri_count(x, regex = "\\S+"), integer(1))
     
-    term_freq <- colSums(as.matrix(dtm))
+    term_freq <- slam::col_sums(dtm)
     
     json <- tryCatch({
       LDAvis::createJSON(
@@ -443,7 +443,7 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
         
         corpus <- Corpus(VectorSource(cleaned_valid))
         dtm <- DocumentTermMatrix(corpus)
-        dtm <- dtm[rowSums(as.matrix(dtm)) > 0, ]
+        dtm <- dtm[slam::row_sums(dtm) > 0, ]
         
         if (nrow(dtm) < 8 || ncol(dtm) < 5) {
           return(div(class = "alert alert-danger",
