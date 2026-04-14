@@ -33,73 +33,135 @@ tags$footer(class = "app-footer",
             )
             
 ),  
-  # Update navbar color and button styles
-  header = tags$style(HTML("
-.navbar { background-color: #1c4474 !important; }
-.navbar-default .navbar-brand { color: white !important; }
-.navbar-default .navbar-nav > li > a { color: white !important; }
-.navbar-default .navbar-nav > .active > a { background-color: #0f2a4a !important; color: white !important; }
-.btn-primary { background-color: #1c4474; border-color: #1a3e6b; }
-.btn-primary:hover { background-color: #1c4474; border-color: #1a3e6b; }
 
-/* only style plain default buttons */
-.btn.btn-default:not(.btn-primary) {
-  background-color: #a02b93;
-  color: white;
-  border-color: #8a267b;
-}
-  .btn-default:hover { background-color: #1c4474; color: white; border-color: #8a267b; }
-  .btn-sm { background-color: #1c4474; color: white; border-color: #1a3e6b; }
-  .btn-sm:hover { background-color: #1c4474; color: white; border-color: #0d243f; }
-  .btn-danger { background-color: #d9534f; border-color: #d43f3a; }
-  .btn-danger:hover { background-color: #c9302c; border-color: #ac2925; }
-  
-  /* keep purple browse button */
-.btn.btn-default:not(#compare):hover {
-  background-color: #a02b93; 
-  color: white; 
-  border-color: #8a267b;
-}
+# ── header: Styles + etracker ──────────────────────────────────
+header = tagList(
+  # --- CSS Styles ---
+  tags$style(HTML("
+      .navbar { background-color: #1c4474 !important; }
+      .navbar-default .navbar-brand { color: white !important; }
+      .navbar-default .navbar-nav > li > a {
+        color: white !important;
+      }
+      .navbar-default .navbar-nav > .active > a {
+        background-color: #0f2a4a !important;
+        color: white !important;
+      }
+      .btn-primary {
+        background-color: #1c4474;
+        border-color: #1a3e6b;
+      }
+      .btn-primary:hover {
+        background-color: #1c4474;
+        border-color: #1a3e6b;
+      }
 
-/* force compare button blue always */
-#compare.btn-primary,
-#compare.btn-primary:hover,
-#compare.btn-primary:focus {
-  background-color: #1c4474 !important;
-  border-color: #1a3e6b !important;
-  color: #fff !important;
-}
+      /* only style plain default buttons */
+      .btn.btn-default:not(.btn-primary) {
+        background-color: #a02b93;
+        color: white;
+        border-color: #8a267b;
+      }
+      .btn-default:hover {
+        background-color: #1c4474;
+        color: white;
+        border-color: #8a267b;
+      }
+      .btn-sm {
+        background-color: #1c4474;
+        color: white;
+        border-color: #1a3e6b;
+      }
+      .btn-sm:hover {
+        background-color: #1c4474;
+        color: white;
+        border-color: #0d243f;
+      }
+      .btn-danger {
+        background-color: #d9534f;
+        border-color: #d43f3a;
+      }
+      .btn-danger:hover {
+        background-color: #c9302c;
+        border-color: #ac2925;
+      }
 
-/* ── Hide empty / phantom navbar tab items ──────────────────────── */
-  .nav.navbar-nav > li > a[href^='#tab-'][data-toggle='tab']:empty,
-  .nav.navbar-nav > li > a[data-bs-toggle='tab']:empty,
-  .nav.navbar-nav > li:has(> a:empty) {
-    display: none !important;
-}
-")),
-tags$style(HTML("
-  html {
-    position: relative;
-    min-height: 100%;
-  }
-  body {
-    padding-bottom: 180px;  /* Increased padding to push content down */
-  }
-  .app-footer {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 70px;  /* Adjust to fit your content */
-    background-color: #1c4474;
-    color: white;
-    padding: 15px 0;
-    text-align: center;
-    font-size: 14px;
-  }
-  .shiny-output-error { visibility: hidden; }
-.shiny-output-error:before { content: ' '; visibility: visible; }
-")),
+      /* keep purple browse button */
+      .btn.btn-default:not(#compare):hover {
+        background-color: #a02b93;
+        color: white;
+        border-color: #8a267b;
+      }
+
+      /* force compare button blue always */
+      #compare.btn-primary,
+      #compare.btn-primary:hover,
+      #compare.btn-primary:focus {
+        background-color: #1c4474 !important;
+        border-color: #1a3e6b !important;
+        color: #fff !important;
+      }
+
+      /* Hide empty / phantom navbar tab items */
+      .nav.navbar-nav > li > a[href^='#tab-'][data-toggle='tab']:empty,
+      .nav.navbar-nav > li > a[data-bs-toggle='tab']:empty,
+      .nav.navbar-nav > li:has(> a:empty) {
+        display: none !important;
+      }
+    ")),
+
+  tags$style(HTML("
+      html {
+        position: relative;
+        min-height: 100%;
+      }
+      body {
+        padding-bottom: 180px;
+      }
+      .app-footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 70px;
+        background-color: #1c4474;
+        color: white;
+        padding: 15px 0;
+        text-align: center;
+        font-size: 14px;
+      }
+      .shiny-output-error { visibility: hidden; }
+      .shiny-output-error:before {
+        content: ' ';
+        visibility: visible;
+      }
+    ")),
+
+  # --- etracker Tracking Code ---
+  tags$head(
+    HTML(sprintf(
+      "
+      <!-- etracker code 6.0 -->
+      <script type='text/javascript'>
+         var et_pagename = '%s';
+         var et_areas    = '%s';
+      </script>
+      <script id='_etLoader'
+              type='text/javascript'
+              charset='UTF-8'
+              data-block-cookies='true'
+              data-secure-code='%s'
+              src='//code.etracker.com/code/e.js'
+              async>
+      </script>
+      <!-- etracker code 6.0 end -->
+      ",
+      Sys.getenv("ET_PAGENAME"),
+      Sys.getenv("ET_AREAS"),
+      Sys.getenv("ET_SECURE_CODE")
+    ))
+  )
+),
 
 # ── PRIVACY BANNER (floating bottom-right corner) ────────────────────────────────
 div(
