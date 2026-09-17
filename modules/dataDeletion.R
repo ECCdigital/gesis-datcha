@@ -371,9 +371,40 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
   }
 
   # ──────────────────────────────────────────────────────────────
+  # Fully dynamic "Number of Topics" slider, sized off dataset size
+  # (mirrors topic_k_range logic in the Quarto report)
+  # ──────────────────────────────────────────────────────────────
+  output$num_topics_ui <- renderUI({
+    n_docs <- 0
+    if (isTRUE(comparison_done()) && !is.null(input$topic_dataset)) {
+      dataset_list <- list(
+        "Removed Posts"   = removed_posts(),
+        "Remaining Posts" = remaining_posts(),
+        "Combined View"   = bind_rows(
+          removed_posts()   %>% mutate(group = "removed"),
+          remaining_posts() %>% mutate(group = "remaining")
+        )
+      )
+      dataset <- dataset_list[[input$topic_dataset]]
+      n_docs  <- if (is.null(dataset)) 0 else nrow(dataset)
+    }
+    
+    if (n_docs < 500) {
+      k_min <- 3; k_max <- 15; k_step <- 1
+    } else {
+      k_min <- 5; k_max <- 25; k_step <- 5
+    }
+    
+    current <- isolate(input$num_topics)
+    default_value <- if (is.null(current)) 5 else min(max(current, k_min), k_max)
+    
+    sliderInput("num_topics", "Number of Topics:",
+                min = k_min, max = k_max, value = default_value, step = k_step)
+  })
+  
+  # ──────────────────────────────────────────────────────────────
   # In renderUI($ldavis_output) – replace the whole modeling part:
   # ──────────────────────────────────────────────────────────────
-  
   output$ldavis_output <- renderUI({
     req(comparison_done(), input$num_topics)
     
