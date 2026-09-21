@@ -146,8 +146,9 @@ div(
 ),
 # 0. Overview Page
 tabPanel("Overview",
-fluidPage(
-useShinyjs(), 
+         fluidPage(
+           id = "overview-page",
+           useShinyjs(), 
 tags$head(
 tags$style(HTML("
                .form-group, .shiny-input-container { margin-bottom: 8px; }
@@ -170,6 +171,22 @@ tags$style(HTML("
                .dataset-stats { background-color: #e8f1ff; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #1c4474; }
                .dataset-stats p { margin: 5px 0; font-weight: bold; }
               .fluid-page { position: relative; min-height: 100vh; }
+              
+              
+/* ============================================================
+   Justify ALL text on the Overview page
+   Uses universal descendant selector + !important so nothing
+   (Shiny, bslib, Bootstrap) can override it.
+   ============================================================ */
+#overview-page,
+#overview-page * {
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  hyphens: auto !important;
+  -webkit-hyphens: auto !important;
+  -moz-hyphens: auto !important;
+  -ms-hyphens: auto !important;
+}
                ")),   
                   
               tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"),
@@ -292,19 +309,38 @@ tags$style(HTML("
                                              tags$strong("If you find any issues or something not working, kindly contact "),
                                              tags$a(href = "mailto:yannik.peters@gesis.org", tags$strong("Dr Yannik Peters (yannik.peters@gesis.org)")),
                                              " or ",
-                                             tags$a(href = "mailto:kunjan.shah@gesis.org", tags$strong("Kunjan Shah (kunjan.shah@gesis.org)"))
-                                           )),
-tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modeling, keyness, or sentiment) may take several minutes to complete, depending on data size. The tool works fastest on small or medium sized data sets. For very large datasets, we recommend calculating the indicators in your local environment."),
-                                         hr(),
-                                         h4("Key Features:"),
-                                         tags$ul(
-                                           tags$li("Identifies removed, added, and edited posts"),
-                                           tags$li("Analyzes word frequency and key terms"),
-                                           tags$li("Performs sentiment and topic analysis"),
-                                           tags$li("Calculates data quality metrics"),
-                                           tags$li("Visualizes text differences")
+                                             tags$a(href = "mailto:kunjan.shah@gesis.org", tags$strong("Kunjan Shah (kunjan.shah@gesis.org)")),
+                                             ". Note that some common limitations of the tool are described in the ",
+                                             tags$em("Note on performance"),
+                                             " below."
+                                           )
+                                           ),
+                                         tags$li(
+                                           tags$strong("Note on performance:"),
+                                           "Some analyses (e.g., topic modeling, keyness, or sentiment) may take several minutes to complete, depending on data size. ",
+                                           "The tool works fastest on small or medium sized data sets. For very large datasets, we recommend calculating the indicators in your local environment. ",
+                                           "If your data exceeds the memory limits of the web application, follow the ",
+                                           tags$a(
+                                             href = "https://kodaqs-toolbox.gesis.org/github.com/kunjanshah0811/Datcha_quarto/index/",
+                                             target = "_blank",
+                                             style = "color: #1c4474; text-decoration: underline; font-weight: bold;",
+                                             "KODAQS tutorial for local use"
+                                           ),
+                                           " to run Datcha on your own machine."
+                                         ),         
+                                         tags$li(
+                                           tags$strong("Cite our tool: "),
+                                           "Peters, Y., Shah, K., Wang, Y., Gruber, J. B., & Weller, K. (2026). ",
+                                           tags$em("Datcha—Introducing a Tool to Track Data Changes and Measure (In)Consistency in Mobile Platform Data."),
+                                           " Mobile Media & Communication, 14(3), 597–603. ",
+                                           tags$a(
+                                             href = "https://doi.org/10.1177/20501579261452767",
+                                             target = "_blank",
+                                             style = "color: #1c4474; text-decoration: underline;",
+                                             "https://doi.org/10.1177/20501579261452767"
+                                           )
                                          ),
-                                         #hr(),
+                                         
 
                                   ),
                                   column(6,
@@ -323,6 +359,15 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                                          tags$ul(
                                            tags$li("A column containing unique post IDs"),
                                            tags$li("A column named 'text' containing the post content")
+                                         ),
+                                         hr(),
+                                         h4("Key Features:"),
+                                         tags$ul(
+                                           tags$li("Identifies removed, added, and edited posts"),
+                                           tags$li("Analyzes word frequency and key terms"),
+                                           tags$li("Performs sentiment and topic analysis"),
+                                           tags$li("Calculates data quality metrics"),
+                                           tags$li("Visualizes text differences")
                                          )
                                   )
                                 )
