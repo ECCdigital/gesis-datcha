@@ -314,6 +314,7 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                                              textOutput("dataset2_count"),
                                              textOutput("removed_count"),
                                              textOutput("overview_added_count"),
+                                             textOutput("edited_post_count"),
                                              textOutput("edited_post_count")
                                          ),
                                          hr(),
