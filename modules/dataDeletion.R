@@ -5,6 +5,7 @@
 dataDeletionModule <- function(input, output, session, shared_data, detect_id_column) {
   # Create a reactive value to track if comparison was done
   
+   
   comparison_done <- reactiveVal(FALSE)
 
   # Observe when compare button is pressed
@@ -139,7 +140,8 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
 
   # Get remaining posts
   remaining_posts <- eventReactive(input$compare, {
-    req(data1(), data2())
+
+        req(data1(), data2())
     df1 <- data1(); df2 <- data2()
     id1 <- detect_id_column(df1, input$id_col_1)
     id2 <- detect_id_column(df2, input$id_col_2)
@@ -461,7 +463,6 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
       
       # ── Only continue if size is ok ──
       withProgress(message = 'Generating topics...', value = 0.4, {
-        
         cleaned <- dataset$cleaned_text   # ← pre-cached
         
         valid_idx <- which(nzchar(trimws(cleaned)))
@@ -481,17 +482,24 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
                      "After cleaning & filtering: insufficient terms/documents for LDA"))
         }
         
-        lda_model <- tryCatch(
-          LDA(dtm, k = input$num_topics, control = list(seed = 1234)),
-          error = function(e) NULL
-        )
+        # ── RESOURCE MONITOR ────────────────────────────────────────────
+        res <- peakRAM::peakRAM({
+          lda_model <- tryCatch(
+            LDA(dtm, k = input$num_topics, control = list(seed = 1234)),
+            error = function(e) NULL
+          )
+        })
+        cat(sprintf(
+          "[LDA-DELETION] %.1f s | Peak RAM: %.0f MB | Total RAM: %.0f MB | docs=%d topics=%d\n",
+          res$Elapsed_Time_sec, res$Peak_RAM_Used_MiB, res$Total_RAM_Used_MiB,
+          nrow(dtm), input$num_topics
+        ))
         
         if (is.null(lda_model)) {
           return(div(class = "alert alert-danger", "LDA failed to converge"))
         }
         
         json <- topicmodels_json_ldavis_safe(lda_model, cleaned_valid, dtm)
-        
         div(
           style = "width: 100%; height: 80vh; min-height: 650px; max-height: 90vh; 
                  border: 1px solid #ddd; border-radius: 8px; overflow: auto; 

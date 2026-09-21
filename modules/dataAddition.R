@@ -1005,7 +1005,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
   observeEvent(input$num_topics_addition, {
     current_topic_addition(0)
   })
-  f
+  
   topicmodels_json_ldavis_safe <- function(fitted, original_texts, dtm) {
     library(dplyr)
     library(stringi)
@@ -1143,10 +1143,19 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
                      "After cleaning & filtering: insufficient terms/documents for LDA"))
         }
         
-        lda_model <- tryCatch(
-          LDA(dtm, k = input$num_topics_addition, control = list(seed = 1234)),
-          error = function(e) NULL
-        )
+        # ── RESOURCE MONITOR ────────────────────────────────────────────
+        res <- peakRAM::peakRAM({
+          lda_model <- tryCatch(
+            LDA(dtm, k = input$num_topics_addition, control = list(seed = 1234)),
+            error = function(e) NULL
+          )
+        })
+        cat(sprintf(
+          "[LDA-ADDITION] %.1f s | Peak RAM: %.0f MB | Total RAM: %.0f MB | docs=%d topics=%d\n",
+          res$Elapsed_Time_sec, res$Peak_RAM_Used_MiB, res$Total_RAM_Used_MiB,
+          nrow(dtm), input$num_topics_addition
+        ))
+        # ────────────────────────────────────────────────────────────────
         
         if (is.null(lda_model)) {
           return(div(class = "alert alert-danger", "LDA failed to converge"))
