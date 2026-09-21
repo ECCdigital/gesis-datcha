@@ -47,8 +47,17 @@ dataEditingModule <- function(input, output, session, shared_data, detect_id_col
   # Calculate edit distances between matching posts
   edit_distances <- eventReactive(input$compare, {
     req(data1(), data2())
-    calculate_edit_distance(data1(), data2(),
-                           input$id_col_1, input$id_col_2)
+    withProgress(
+      message = "Computing Levenshtein edit distances",
+      detail  = "Matching posts and calculating string distances...",
+      value   = 0.2,
+      {
+        res <- calculate_edit_distance(data1(), data2(),
+                                       input$id_col_1, input$id_col_2)
+        incProgress(0.8, detail = "Done")
+        res
+      }
+    )
   })
 
   # Reactive Data Editing Section
@@ -155,8 +164,25 @@ dataEditingModule <- function(input, output, session, shared_data, detect_id_col
       paste0("<div style='white-space:pre-wrap;'>", html, "</div>")
     }
     
-    df$text_1 <- unname(mapply(apply_diff, df$text_1, df$text_2, SIMPLIFY = FALSE))
-    df$text_2 <- unname(mapply(apply_diff, df$text_2, df$text_1, SIMPLIFY = FALSE))
+    # Compute diffs inside withProgress, but return the results and assign
+    # them to `df` outside the block. Avoid `<<-` (it can accidentally bind
+    # to stats::df, which is a closure, and crash with "closure is not
+    # subsettable").
+    diff_results <- withProgress(
+      message = "Rendering text differences",
+      detail  = paste0("Comparing ", nrow(df), " edited post(s)..."),
+      value   = 0.1,
+      {
+        res_1 <- unname(mapply(apply_diff, df$text_1, df$text_2, SIMPLIFY = FALSE))
+        incProgress(0.4, detail = "Building side-by-side view...")
+        res_2 <- unname(mapply(apply_diff, df$text_2, df$text_1, SIMPLIFY = FALSE))
+        incProgress(0.4, detail = "Done")
+        list(text_1 = res_1, text_2 = res_2)
+      }
+    )
+    
+    df$text_1 <- diff_results$text_1
+    df$text_2 <- diff_results$text_2
     
     datatable(
       data.frame(

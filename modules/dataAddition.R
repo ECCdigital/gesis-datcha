@@ -43,7 +43,16 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     df <- df2 %>% filter(!(!!sym(id2) %in% df1[[id1]]))
     
     df$cleaned_text <- if (nrow(df) > 0) {
-      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+      withProgress(
+        message = "Cleaning added posts text",
+        detail  = "Removing stopwords, punctuation, lemmatizing...",
+        value   = 0.2,
+        {
+          result <- text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+          incProgress(0.8, detail = "Done")
+          result
+        }
+      )
     } else {
       character(0)
     }
@@ -103,12 +112,21 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     df <- df2 %>% filter(!!sym(id2) %in% df1[[id1]])  # ← ADD THIS
     
     df$cleaned_text <- if (nrow(df) > 0) {
-      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+      withProgress(
+        message = "Cleaning original posts text",
+        detail  = "Removing stopwords, punctuation, lemmatizing...",
+        value   = 0.2,
+        {
+          result <- text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+          incProgress(0.8, detail = "Done")
+          result
+        }
+      )
     } else {
       character(0)
     }
     df
-})
+  })
   
   # Calculate the number of posts in Dataset 1
   output$dataset1_count_addition <- renderText({
@@ -169,9 +187,18 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         )
       }
       
-      word_freq <- text_processor$get_freq(cleaned_text) %>%
-        filter(freq > 1) %>%
-        slice_head(n = 100)
+      word_freq <- withProgress(
+        message = "Computing word frequencies (Added)",
+        detail  = "Tokenizing and counting...",
+        value   = 0.3,
+        {
+          res <- text_processor$get_freq(cleaned_text) %>%
+            filter(freq > 1) %>%
+            slice_head(n = 100)
+          incProgress(0.7)
+          res
+        }
+      )
       
       if (nrow(word_freq) == 0) {
         return(
@@ -232,9 +259,18 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     if (is.null(cleaned_text)) return(NULL)
     
     word_freq <- tryCatch({
-      text_processor$get_freq(cleaned_text) %>%
-        filter(freq > 1) %>%
-        slice_head(n = 100)
+      withProgress(
+        message = "Computing word frequencies (Original)",
+        detail  = "Tokenizing and counting...",
+        value   = 0.3,
+        {
+          res <- text_processor$get_freq(cleaned_text) %>%
+            filter(freq > 1) %>%
+            slice_head(n = 100)
+          incProgress(0.7)
+          res
+        }
+      )
     }, error = function(e) {
       showNotification(paste("Error calculating word frequencies for original posts:", e$message), type = "error")
       return(NULL)
@@ -387,6 +423,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         log_ratio      = numeric(0),
         word_use       = character(0)
       )
+      incProgress(0.7, detail = "Finalising measures...")
       return(list(
         overuse   = empty_tbl,
         underuse  = empty_tbl,
@@ -397,7 +434,8 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       ))
     }
     
-    withProgress(message = 'Analyzing key terms...', value = 0.5, {
+    withProgress(message = 'Computing keyness (addition)', value = 0.15, {
+      incProgress(0.15, detail = "Preparing frequency table...")
       freq_table <- keyness_analyzer_addition$prepare_data(added_posts(), original_posts())
       measures   <- keyness_analyzer_addition$calculate_keyness(freq_table)
       
@@ -794,13 +832,20 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         return(NULL)
       }
       
-      # This line eliminates the annoying sentimentr warning forever
-      sentences <- get_sentences(text_data)
-      
-      scores <- sentiment_by(sentences)$ave_sentiment
+      scores <- withProgress(
+        message = "Scoring sentiment (Added Posts)",
+        detail  = paste0("Analysing ", length(text_data), " posts..."),
+        value   = 0.3,
+        {
+          sentences <- get_sentences(text_data)
+          s <- sentiment_by(sentences)$ave_sentiment
+          incProgress(0.7, detail = "Aggregating results...")
+          s
+        }
+      )
       
       neg_count <- sum(scores < 0, na.rm = TRUE)
-      neu_count <- sum(abs(scores) < 0.01, na.rm = TRUE)   # neutral zone
+      neu_count <- sum(abs(scores) < 0.01, na.rm = TRUE)
       pos_count <- sum(scores > 0, na.rm = TRUE)
       total     <- length(scores)
       
@@ -811,7 +856,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         total = total
       )
     }, error = function(e) {
-      NULL   # graceful fallback
+      NULL
     })
   })
   
@@ -848,7 +893,6 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     }"))
   })
   
-  # Similarly for original (symmetric fix)
   sentiment_data_original <- reactive({
     req(comparison_done(), original_posts())
     
@@ -857,7 +901,16 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       return(NULL)
     }
     
-    scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
+    scores <- withProgress(
+      message = "Scoring sentiment (Original Posts)",
+      detail  = paste0("Analysing ", length(text_data), " posts..."),
+      value   = 0.3,
+      {
+        s <- sentimentr::sentiment_by(text_data)$ave_sentiment
+        incProgress(0.7, detail = "Aggregating results...")
+        s
+      }
+    )
     
     neg_count <- sum(scores < 0, na.rm = TRUE)
     neu_count <- sum(scores == 0, na.rm = TRUE)
@@ -1122,8 +1175,8 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       }
       
       # ── Only continue if size is ok ──
-      withProgress(message = 'Generating topics...', value = 0.4, {
-        
+      withProgress(message = 'Generating topics (LDA)', value = 0.4, {
+        incProgress(0.1, detail = "Building document-term matrix...")        
         cleaned <- dataset$cleaned_text   # ← pre-cached
         
         valid_idx <- which(nzchar(trimws(cleaned)))
@@ -1162,6 +1215,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         }
         
         json <- topicmodels_json_ldavis_safe(lda_model, cleaned_valid, dtm)
+        incProgress(0.4, detail = "Rendering LDAvis visualisation...")
         
         div(
           style = "width: 100%; height: 80vh; min-height: 650px; max-height: 90vh; 

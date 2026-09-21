@@ -129,9 +129,17 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     }
     df <- df1 %>% filter(!( !!sym(id1) %in% df2[[id2]] ))
     
-    # === CENTRAL CACHE: clean once ===
     df$cleaned_text <- if (nrow(df) > 0) {
-      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+      withProgress(
+        message = "Cleaning removed posts text",
+        detail  = "Removing stopwords, punctuation, lemmatizing...",
+        value   = 0.2,
+        {
+          result <- text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+          incProgress(0.8, detail = "Done")
+          result
+        }
+      )
     } else {
       character(0)
     }
@@ -150,9 +158,17 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     }
     df <- df1 %>% filter( !!sym(id1) %in% df2[[id2]] )
     
-    # === CENTRAL CACHE: clean once ===
     df$cleaned_text <- if (nrow(df) > 0) {
-      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+      withProgress(
+        message = "Cleaning remaining posts text",
+        detail  = "Removing stopwords, punctuation, lemmatizing...",
+        value   = 0.2,
+        {
+          result <- text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+          incProgress(0.8, detail = "Done")
+          result
+        }
+      )
     } else {
       character(0)
     }
@@ -225,9 +241,18 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
         closeButton = TRUE
       )}
     
-    word_freq <- text_processor$get_freq(cleaned_text) %>%
-      filter(freq > 1) %>%
-      slice(1:100)  # Add slicing to match original behavior
+    word_freq <- withProgress(
+      message = "Computing word frequencies (Removed)",
+      detail  = "Tokenizing and counting...",
+      value   = 0.3,
+      {
+        res <- text_processor$get_freq(cleaned_text) %>%
+          filter(freq > 1) %>%
+          slice(1:100)
+        incProgress(0.7)
+        res
+      }
+    )
 
     highchart() %>%
       hc_chart(type = "bar") %>%
@@ -291,9 +316,18 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
         closeButton = TRUE
       )}
     
-    word_freq <- text_processor$get_freq(cleaned_text) %>%
-      filter(freq > 1) %>%
-      slice(1:100)
+    word_freq <- withProgress(
+      message = "Computing word frequencies (Remaining)",
+      detail  = "Tokenizing and counting...",
+      value   = 0.3,
+      {
+        res <- text_processor$get_freq(cleaned_text) %>%
+          filter(freq > 1) %>%
+          slice(1:100)
+        incProgress(0.7)
+        res
+      }
+    )
 
     highchart() %>%
       hc_chart(type = "bar") %>%
@@ -462,7 +496,8 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
       }
       
       # ── Only continue if size is ok ──
-      withProgress(message = 'Generating topics...', value = 0.4, {
+      withProgress(message = 'Generating topics (LDA)', value = 0.4, {
+        incProgress(0.1, detail = "Building document-term matrix...")
         cleaned <- dataset$cleaned_text   # ← pre-cached
         
         valid_idx <- which(nzchar(trimws(cleaned)))
@@ -500,6 +535,8 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
         }
         
         json <- topicmodels_json_ldavis_safe(lda_model, cleaned_valid, dtm)
+        incProgress(0.4, detail = "Rendering LDAvis visualisation...")
+        
         div(
           style = "width: 100%; height: 80vh; min-height: 650px; max-height: 90vh; 
                  border: 1px solid #ddd; border-radius: 8px; overflow: auto; 
@@ -595,17 +632,26 @@ sentiment_data_removed <- reactive({
     return(NULL)
   }
   
-  scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
+  scores <- withProgress(
+    message = "Scoring sentiment (Removed Posts)",
+    detail  = paste0("Analysing ", length(text_data), " posts..."),
+    value   = 0.3,
+    {
+      s <- sentimentr::sentiment_by(text_data)$ave_sentiment
+      incProgress(0.7, detail = "Aggregating results...")
+      s
+    }
+  )
   
   neg_count <- sum(scores < 0, na.rm = TRUE)
-  neu_count <- sum(scores == 0, na.rm = TRUE)   # adjust range if your neutral is wider
+  neu_count <- sum(scores == 0, na.rm = TRUE)
   pos_count <- sum(scores > 0, na.rm = TRUE)
-  total <- length(scores)
+  total     <- length(scores)
   
   if (total == 0) return(NULL)
   
   list(
-    pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
+    pct   = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
     total = total
   )
 })
@@ -619,17 +665,26 @@ sentiment_data_remaining <- reactive({
     return(NULL)
   }
   
-  scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
+  scores <- withProgress(
+    message = "Scoring sentiment (Remaining Posts)",
+    detail  = paste0("Analysing ", length(text_data), " posts..."),
+    value   = 0.3,
+    {
+      s <- sentimentr::sentiment_by(text_data)$ave_sentiment
+      incProgress(0.7, detail = "Aggregating results...")
+      s
+    }
+  )
   
   neg_count <- sum(scores < 0, na.rm = TRUE)
   neu_count <- sum(scores == 0, na.rm = TRUE)
   pos_count <- sum(scores > 0, na.rm = TRUE)
-  total <- length(scores)
+  total     <- length(scores)
   
   if (total == 0) return(NULL)
   
   list(
-    pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
+    pct   = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
     total = total
   )
 })
@@ -821,7 +876,8 @@ keyness_analyzer <- list(
 keyness_results <- reactive({
   req(removed_posts(), remaining_posts())
   
-  withProgress(message = 'Analyzing key terms...', value = 0.5, {
+  withProgress(message = 'Computing keyness (deletion)', value = 0.15, {
+    incProgress(0.15, detail = "Preparing frequency table...")
     freq_table <- keyness_analyzer$prepare_data(removed_posts(), remaining_posts())
     measures <- keyness_analyzer$calculate_keyness(freq_table)
     
