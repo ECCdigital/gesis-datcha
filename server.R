@@ -11,6 +11,12 @@ source("modules/dataEditing.R")
 
 # 2. Define server
 server <- function(input, output, session) {
+
+  observe({
+    invalidateLater(30000, session)   # every 30 s
+    used_mb <- sum(gc()[, 2])         # total used RAM in MB
+    cat(sprintf("[MONITOR] %s | session RAM: %.0f MB\n", Sys.time(), used_mb))
+  })
   
   # Initialize shared reactive values  ← MOVED FROM global.R
   shared_data <- reactiveValues(

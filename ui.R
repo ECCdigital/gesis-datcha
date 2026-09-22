@@ -33,135 +33,73 @@ tags$footer(class = "app-footer",
             )
             
 ),  
+  # Update navbar color and button styles
+  header = tags$style(HTML("
+.navbar { background-color: #1c4474 !important; }
+.navbar-default .navbar-brand { color: white !important; }
+.navbar-default .navbar-nav > li > a { color: white !important; }
+.navbar-default .navbar-nav > .active > a { background-color: #0f2a4a !important; color: white !important; }
+.btn-primary { background-color: #1c4474; border-color: #1a3e6b; }
+.btn-primary:hover { background-color: #1c4474; border-color: #1a3e6b; }
 
-# ── header: Styles + etracker ──────────────────────────────────
-header = tagList(
-  # --- CSS Styles ---
-  tags$style(HTML("
-      .navbar { background-color: #1c4474 !important; }
-      .navbar-default .navbar-brand { color: white !important; }
-      .navbar-default .navbar-nav > li > a {
-        color: white !important;
-      }
-      .navbar-default .navbar-nav > .active > a {
-        background-color: #0f2a4a !important;
-        color: white !important;
-      }
-      .btn-primary {
-        background-color: #1c4474;
-        border-color: #1a3e6b;
-      }
-      .btn-primary:hover {
-        background-color: #1c4474;
-        border-color: #1a3e6b;
-      }
+/* only style plain default buttons */
+.btn.btn-default:not(.btn-primary) {
+  background-color: #a02b93;
+  color: white;
+  border-color: #8a267b;
+}
+  .btn-default:hover { background-color: #1c4474; color: white; border-color: #8a267b; }
+  .btn-sm { background-color: #1c4474; color: white; border-color: #1a3e6b; }
+  .btn-sm:hover { background-color: #1c4474; color: white; border-color: #0d243f; }
+  .btn-danger { background-color: #d9534f; border-color: #d43f3a; }
+  .btn-danger:hover { background-color: #c9302c; border-color: #ac2925; }
+  
+  /* keep purple browse button */
+.btn.btn-default:not(#compare):hover {
+  background-color: #a02b93; 
+  color: white; 
+  border-color: #8a267b;
+}
 
-      /* only style plain default buttons */
-      .btn.btn-default:not(.btn-primary) {
-        background-color: #a02b93;
-        color: white;
-        border-color: #8a267b;
-      }
-      .btn-default:hover {
-        background-color: #1c4474;
-        color: white;
-        border-color: #8a267b;
-      }
-      .btn-sm {
-        background-color: #1c4474;
-        color: white;
-        border-color: #1a3e6b;
-      }
-      .btn-sm:hover {
-        background-color: #1c4474;
-        color: white;
-        border-color: #0d243f;
-      }
-      .btn-danger {
-        background-color: #d9534f;
-        border-color: #d43f3a;
-      }
-      .btn-danger:hover {
-        background-color: #c9302c;
-        border-color: #ac2925;
-      }
+/* force compare button blue always */
+#compare.btn-primary,
+#compare.btn-primary:hover,
+#compare.btn-primary:focus {
+  background-color: #1c4474 !important;
+  border-color: #1a3e6b !important;
+  color: #fff !important;
+}
 
-      /* keep purple browse button */
-      .btn.btn-default:not(#compare):hover {
-        background-color: #a02b93;
-        color: white;
-        border-color: #8a267b;
-      }
-
-      /* force compare button blue always */
-      #compare.btn-primary,
-      #compare.btn-primary:hover,
-      #compare.btn-primary:focus {
-        background-color: #1c4474 !important;
-        border-color: #1a3e6b !important;
-        color: #fff !important;
-      }
-
-      /* Hide empty / phantom navbar tab items */
-      .nav.navbar-nav > li > a[href^='#tab-'][data-toggle='tab']:empty,
-      .nav.navbar-nav > li > a[data-bs-toggle='tab']:empty,
-      .nav.navbar-nav > li:has(> a:empty) {
-        display: none !important;
-      }
-    ")),
-
-  tags$style(HTML("
-      html {
-        position: relative;
-        min-height: 100%;
-      }
-      body {
-        padding-bottom: 180px;
-      }
-      .app-footer {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 70px;
-        background-color: #1c4474;
-        color: white;
-        padding: 15px 0;
-        text-align: center;
-        font-size: 14px;
-      }
-      .shiny-output-error { visibility: hidden; }
-      .shiny-output-error:before {
-        content: ' ';
-        visibility: visible;
-      }
-    ")),
-
-  # --- etracker Tracking Code ---
-  tags$head(
-    HTML(sprintf(
-      "
-      <!-- etracker code 6.0 -->
-      <script type='text/javascript'>
-         var et_pagename = '%s';
-         var et_areas    = '%s';
-      </script>
-      <script id='_etLoader'
-              type='text/javascript'
-              charset='UTF-8'
-              data-block-cookies='true'
-              data-secure-code='%s'
-              src='//code.etracker.com/code/e.js'
-              async>
-      </script>
-      <!-- etracker code 6.0 end -->
-      ",
-      Sys.getenv("ET_PAGENAME"),
-      Sys.getenv("ET_AREAS"),
-      Sys.getenv("ET_SECURE_CODE")
-    ))
-  )
-),
+/* ── Hide empty / phantom navbar tab items ──────────────────────── */
+  .nav.navbar-nav > li > a[href^='#tab-'][data-toggle='tab']:empty,
+  .nav.navbar-nav > li > a[data-bs-toggle='tab']:empty,
+  .nav.navbar-nav > li:has(> a:empty) {
+    display: none !important;
+}
+")),
+tags$style(HTML("
+  html {
+    position: relative;
+    min-height: 100%;
+  }
+  body {
+    padding-bottom: 180px;  /* Increased padding to push content down */
+  }
+  .app-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;  /* Adjust to fit your content */
+    background-color: #1c4474;
+    color: white;
+    padding: 15px 0;
+    text-align: center;
+    font-size: 14px;
+  }
+  .shiny-output-error { visibility: hidden; }
+.shiny-output-error:before { content: ' '; visibility: visible; }
+")),
 
 # ── PRIVACY BANNER (floating bottom-right corner) ────────────────────────────────
 div(
@@ -208,8 +146,9 @@ div(
 ),
 # 0. Overview Page
 tabPanel("Overview",
-fluidPage(
-useShinyjs(), 
+         fluidPage(
+           id = "overview-page",
+           useShinyjs(), 
 tags$head(
 tags$style(HTML("
                .form-group, .shiny-input-container { margin-bottom: 8px; }
@@ -218,7 +157,13 @@ tags$style(HTML("
                .tooltip-inner { max-width: 300px; padding: 10px; background-color: #f8f9fa; color: #212529; border: 1px solid #dee2e6; border-radius: 4px; }
                .fa-info-circle { color: #007bff; margin-left: 5px; cursor: pointer; }
                .highlight-topic { stroke: #FF5722 !important; stroke-width: 3px !important; filter: drop-shadow(0 0 5px rgba(255, 87, 34, 0.5)); }
-               #ldavis_output { height: 80vh; min-height: 500px; width: 100%; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: white; }
+               #ldavis_output,
+#ldavis-wrapper-deletion,
+#ldavis-wrapper-addition {
+  min-width: 1000px;
+  height: 80vh;
+  min-height: 650px;
+}
                .topic-controls { margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; }
                .topic-nav-buttons { display: flex; justify-content: space-between; margin-top: 10px; }
                .datatable { margin: 20px 0; }
@@ -226,6 +171,22 @@ tags$style(HTML("
                .dataset-stats { background-color: #e8f1ff; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #1c4474; }
                .dataset-stats p { margin: 5px 0; font-weight: bold; }
               .fluid-page { position: relative; min-height: 100vh; }
+              
+              
+/* ============================================================
+   Justify ALL text on the Overview page
+   Uses universal descendant selector + !important so nothing
+   (Shiny, bslib, Bootstrap) can override it.
+   ============================================================ */
+#overview-page,
+#overview-page * {
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  hyphens: auto !important;
+  -webkit-hyphens: auto !important;
+  -moz-hyphens: auto !important;
+  -ms-hyphens: auto !important;
+}
                ")),   
                   
               tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"),
@@ -348,19 +309,38 @@ tags$style(HTML("
                                              tags$strong("If you find any issues or something not working, kindly contact "),
                                              tags$a(href = "mailto:yannik.peters@gesis.org", tags$strong("Dr Yannik Peters (yannik.peters@gesis.org)")),
                                              " or ",
-                                             tags$a(href = "mailto:kunjan.shah@gesis.org", tags$strong("Kunjan Shah (kunjan.shah@gesis.org)"))
-                                           )),
-tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modeling, keyness, or sentiment) may take several minutes to complete, depending on data size. The tool works fastest on small or medium sized data sets. For very large datasets, we recommend calculating the indicators in your local environment."),
-                                         hr(),
-                                         h4("Key Features:"),
-                                         tags$ul(
-                                           tags$li("Identifies removed, added, and edited posts"),
-                                           tags$li("Analyzes word frequency and key terms"),
-                                           tags$li("Performs sentiment and topic analysis"),
-                                           tags$li("Calculates data quality metrics"),
-                                           tags$li("Visualizes text differences")
+                                             tags$a(href = "mailto:kunjan.shah@gesis.org", tags$strong("Kunjan Shah (kunjan.shah@gesis.org)")),
+                                             ". Note that some common limitations of the tool are described in the ",
+                                             tags$em("Note on performance"),
+                                             " below."
+                                           )
+                                           ),
+                                         tags$li(
+                                           tags$strong("Note on performance:"),
+                                           "Some analyses (e.g., topic modeling, keyness, or sentiment) may take several minutes to complete, depending on data size. ",
+                                           "The tool works fastest on small or medium sized data sets. For very large datasets, we recommend calculating the indicators in your local environment. ",
+                                           "If your data exceeds the memory limits of the web application, follow the ",
+                                           tags$a(
+                                             href = "https://kodaqs-toolbox.gesis.org/github.com/kunjanshah0811/Datcha_quarto/index/",
+                                             target = "_blank",
+                                             style = "color: #1c4474; text-decoration: underline; font-weight: bold;",
+                                             "KODAQS tutorial for local use"
+                                           ),
+                                           " to run Datcha on your own machine."
+                                         ),         
+                                         tags$li(
+                                           tags$strong("Cite our tool: "),
+                                           "Peters, Y., Shah, K., Wang, Y., Gruber, J. B., & Weller, K. (2026). ",
+                                           tags$em("Datcha—Introducing a Tool to Track Data Changes and Measure (In)Consistency in Mobile Platform Data."),
+                                           " Mobile Media & Communication, 14(3), 597–603. ",
+                                           tags$a(
+                                             href = "https://doi.org/10.1177/20501579261452767",
+                                             target = "_blank",
+                                             style = "color: #1c4474; text-decoration: underline;",
+                                             "https://doi.org/10.1177/20501579261452767"
+                                           )
                                          ),
-                                         #hr(),
+                                         
 
                                   ),
                                   column(6,
@@ -370,6 +350,7 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                                              textOutput("dataset2_count"),
                                              textOutput("removed_count"),
                                              textOutput("overview_added_count"),
+                                             textOutput("edited_post_count"),
                                              textOutput("edited_post_count")
                                          ),
                                          hr(),
@@ -378,6 +359,15 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                                          tags$ul(
                                            tags$li("A column containing unique post IDs"),
                                            tags$li("A column named 'text' containing the post content")
+                                         ),
+                                         hr(),
+                                         h4("Key Features:"),
+                                         tags$ul(
+                                           tags$li("Identifies removed, added, and edited posts"),
+                                           tags$li("Analyzes word frequency and key terms"),
+                                           tags$li("Performs sentiment and topic analysis"),
+                                           tags$li("Calculates data quality metrics"),
+                                           tags$li("Visualizes text differences")
                                          )
                                   )
                                 )
@@ -400,8 +390,7 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                    condition = "input.data_deletion_tabs == 'Topic Modeling'",
                    div(class = "topic-controls",
                        h4("Topic Controls"),
-                       sliderInput("num_topics", "Number of Topics:", 
-                                   min = 2, max = 10, value = 5, step = 1),
+                       uiOutput("num_topics_ui"),
                        radioButtons("topic_dataset", "Show Topics For:",
                                     choices = c("Removed Posts", "Remaining Posts", "Combined View"),
                                     selected = "Removed Posts"),
@@ -484,17 +473,15 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
            )
   ),
   
-  # Data Addition Tab
-  tabPanel("Data Addition",
-           fluidPage(
-             useShinyjs(),
+# Data Addition Tab
+tabPanel("Data Addition",
+         fluidPage(
+           useShinyjs(),
+           sidebarLayout(                          # ← opens sidebarLayout
              sidebarPanel(
                width = 3,
                h4("Summary Statistics"),
                uiOutput("addition_quality_indicators"),
-               #textOutput("dataset1_count_addition"),
-               #textOutput("dataset2_count_addition"),
-               #textOutput("added_count"),
                textOutput("growth_rate"),
                textOutput("daily_addition_rate"),
                
@@ -502,8 +489,7 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                  condition = "input.data_addition == 'Topic Modeling'",
                  div(class = "topic-controls",
                      h4("Topic Controls"),
-                     sliderInput("num_topics_addition", "Number of Topics:", 
-                                 min = 2, max = 10, value = 5, step = 1),
+                     uiOutput("num_topics_addition_ui"),
                      radioButtons("topic_dataset_addition", "Show Topics For:",
                                   choices = c("Added Posts", "Original Posts", "Combined View"),
                                   selected = "Added Posts"),
@@ -515,8 +501,9 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                      )
                  )
                )
-             ),
-             mainPanel(
+             ),                                    # ← closes sidebarPanel
+             
+             mainPanel(                            # ← mainPanel is INSIDE sidebarLayout
                width = 9,
                tabsetPanel(
                  id = "data_addition",
@@ -525,20 +512,20 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                             column(6,
                                    h4("Added Posts"),
                                    highchartOutput("word_freq_plot_added", height = "450px"),
-                                   uiOutput("word_freq_added_alert")            # ← added
+                                   uiOutput("word_freq_added_alert")
                             ),
                             column(6,
                                    h4("Original Posts"),
                                    highchartOutput("word_freq_plot_original", height = "450px"),
-                                   uiOutput("word_freq_original_alert")         # ← added
+                                   uiOutput("word_freq_original_alert")
                             )
-                          
-                 )),
+                          )
+                 ),
                  tabPanel("Keyness Analysis",
                           fluidRow(
                             column(12,
                                    tabsetPanel(
-                                     id = "keyness_tabs_addition",  # Unique ID for Data Addition
+                                     id = "keyness_tabs_addition",
                                      tabPanel("Added Posts", value = "added"),
                                      tabPanel("Original Posts", value = "original"),
                                      tabPanel("Combined View", value = "combined")
@@ -546,9 +533,6 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                                    highchartOutput("keyness_plot_addition"),
                                    uiOutput("keyness_interpretation_addition"),
                                    uiOutput("keyness_alert_addition")
-                                   # hr(),
-                                   # h5("DEBUG: Why is Keyness working here?"),
-                                   # verbatimTextOutput("keyness_debug_output_addition")
                             )
                           )
                  ),
@@ -590,9 +574,10 @@ tags$li(tags$strong("Note on performance:"), "Some analyses (e.g., topic modelin
                           )
                  )
                )
-             )
-           )
-  ),
+             )                                     # ← closes mainPanel
+           )                                       # ← closes sidebarLayout
+         )                                         # ← closes fluidPage
+),                                                 # ← closes tabPanel
   
   # Data Edition Tab (updated with sidebar)
   tabPanel("Data Editing",
