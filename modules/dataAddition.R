@@ -43,7 +43,16 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     df <- df2 %>% filter(!(!!sym(id2) %in% df1[[id1]]))
     
     df$cleaned_text <- if (nrow(df) > 0) {
-      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+      withProgress(
+        message = "Cleaning added posts text",
+        detail  = "Removing stopwords, punctuation, lemmatizing...",
+        value   = 0.2,
+        {
+          result <- text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+          incProgress(0.8, detail = "Done")
+          result
+        }
+      )
     } else {
       character(0)
     }
@@ -103,12 +112,21 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     df <- df2 %>% filter(!!sym(id2) %in% df1[[id1]])  # ← ADD THIS
     
     df$cleaned_text <- if (nrow(df) > 0) {
-      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+      withProgress(
+        message = "Cleaning original posts text",
+        detail  = "Removing stopwords, punctuation, lemmatizing...",
+        value   = 0.2,
+        {
+          result <- text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+          incProgress(0.8, detail = "Done")
+          result
+        }
+      )
     } else {
       character(0)
     }
     df
-})
+  })
   
   # Calculate the number of posts in Dataset 1
   output$dataset1_count_addition <- renderText({
@@ -169,9 +187,18 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         )
       }
       
-      word_freq <- text_processor$get_freq(cleaned_text) %>%
-        filter(freq > 1) %>%
-        slice_head(n = 100)
+      word_freq <- withProgress(
+        message = "Computing word frequencies (Added)",
+        detail  = "Tokenizing and counting...",
+        value   = 0.3,
+        {
+          res <- text_processor$get_freq(cleaned_text) %>%
+            filter(freq > 1) %>%
+            slice_head(n = 100)
+          incProgress(0.7)
+          res
+        }
+      )
       
       if (nrow(word_freq) == 0) {
         return(
@@ -232,9 +259,18 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     if (is.null(cleaned_text)) return(NULL)
     
     word_freq <- tryCatch({
-      text_processor$get_freq(cleaned_text) %>%
-        filter(freq > 1) %>%
-        slice_head(n = 100)
+      withProgress(
+        message = "Computing word frequencies (Original)",
+        detail  = "Tokenizing and counting...",
+        value   = 0.3,
+        {
+          res <- text_processor$get_freq(cleaned_text) %>%
+            filter(freq > 1) %>%
+            slice_head(n = 100)
+          incProgress(0.7)
+          res
+        }
+      )
     }, error = function(e) {
       showNotification(paste("Error calculating word frequencies for original posts:", e$message), type = "error")
       return(NULL)
@@ -387,6 +423,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         log_ratio      = numeric(0),
         word_use       = character(0)
       )
+      incProgress(0.7, detail = "Finalising measures...")
       return(list(
         overuse   = empty_tbl,
         underuse  = empty_tbl,
@@ -397,7 +434,8 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       ))
     }
     
-    withProgress(message = 'Analyzing key terms...', value = 0.5, {
+    withProgress(message = 'Computing keyness (addition)', value = 0.15, {
+      incProgress(0.15, detail = "Preparing frequency table...")
       freq_table <- keyness_analyzer_addition$prepare_data(added_posts(), original_posts())
       measures   <- keyness_analyzer_addition$calculate_keyness(freq_table)
       
@@ -794,13 +832,20 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         return(NULL)
       }
       
-      # This line eliminates the annoying sentimentr warning forever
-      sentences <- get_sentences(text_data)
-      
-      scores <- sentiment_by(sentences)$ave_sentiment
+      scores <- withProgress(
+        message = "Scoring sentiment (Added Posts)",
+        detail  = paste0("Analysing ", length(text_data), " posts..."),
+        value   = 0.3,
+        {
+          sentences <- get_sentences(text_data)
+          s <- sentiment_by(sentences)$ave_sentiment
+          incProgress(0.7, detail = "Aggregating results...")
+          s
+        }
+      )
       
       neg_count <- sum(scores < 0, na.rm = TRUE)
-      neu_count <- sum(abs(scores) < 0.01, na.rm = TRUE)   # neutral zone
+      neu_count <- sum(abs(scores) < 0.01, na.rm = TRUE)
       pos_count <- sum(scores > 0, na.rm = TRUE)
       total     <- length(scores)
       
@@ -811,7 +856,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         total = total
       )
     }, error = function(e) {
-      NULL   # graceful fallback
+      NULL
     })
   })
   
@@ -848,7 +893,6 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     }"))
   })
   
-  # Similarly for original (symmetric fix)
   sentiment_data_original <- reactive({
     req(comparison_done(), original_posts())
     
@@ -857,7 +901,16 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
       return(NULL)
     }
     
-    scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
+    scores <- withProgress(
+      message = "Scoring sentiment (Original Posts)",
+      detail  = paste0("Analysing ", length(text_data), " posts..."),
+      value   = 0.3,
+      {
+        s <- sentimentr::sentiment_by(text_data)$ave_sentiment
+        incProgress(0.7, detail = "Aggregating results...")
+        s
+      }
+    )
     
     neg_count <- sum(scores < 0, na.rm = TRUE)
     neu_count <- sum(scores == 0, na.rm = TRUE)
@@ -1006,111 +1059,140 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
     current_topic_addition(0)
   })
   
-  # Ensure the topicmodels_json_ldavis function is included (unchanged from your provided code):
-  topicmodels_json_ldavis <- function(fitted, text_vector, doc_term) {
-    library(dplyr)
+  topicmodels_json_ldavis_safe <- function(fitted, original_texts, dtm) {
     library(stringi)
     
-    phi <- posterior(fitted)$terms %>% as.matrix()
-    theta <- posterior(fitted)$topics %>% as.matrix()
+    # ── 1. Extract posteriors ────────────────────────────────────────
+    phi   <- as.matrix(topicmodels::posterior(fitted)$terms)   # K x V
+    theta <- as.matrix(topicmodels::posterior(fitted)$topics)  # D x K
+    
+    if (!identical(ncol(theta), nrow(phi)))
+      stop(sprintf("theta cols (%d) != phi rows (%d)", ncol(theta), nrow(phi)))
+    
+    # ── 2. Scrub non-finite / negative ───────────────────────────────
+    phi[!is.finite(phi)]     <- 0
+    theta[!is.finite(theta)] <- 0
+    phi[phi   < 0] <- 0
+    theta[theta < 0] <- 0
+    
+    # ── 3. Drop effectively-empty topics (threshold, not > 0) ───────
+    keep_topic <- rowSums(phi) > 1e-10
+    if (!any(keep_topic)) stop("All topic rows in phi are effectively zero")
+    phi   <- phi[keep_topic, , drop = FALSE]
+    theta <- theta[, keep_topic, drop = FALSE]
+    
+    # ── 4. Drop effectively-empty documents ─────────────────────────
+    keep_doc <- rowSums(theta) > 1e-10
+    if (!any(keep_doc)) stop("All doc rows in theta are effectively zero")
+    theta    <- theta[keep_doc, , drop = FALSE]
+    text_idx <- which(keep_doc)
+    
+    # ── 5. Row-normalise (LDAvis requires rows of phi to sum to 1) ──
+    phi   <- phi   / rowSums(phi)
+    theta <- theta / rowSums(theta)
+    
+    # ── 6. Clip FP noise, then renormalise once more ────────────────
+    phi[phi     < 0] <- 0
+    theta[theta < 0] <- 0
+    phi   <- phi   / rowSums(phi)
+    theta <- theta / rowSums(theta)
+    
+    # ── 7. Hard assertion before handing off to createJSON ──────────
+    bad <- which(abs(rowSums(phi) - 1) > 1e-6)
+    if (length(bad))
+      stop(sprintf("phi rows not 1 after normalisation: %s",
+                   paste(bad, collapse = ",")))
+    
+    # ── 8. Align vocab / doc.length / term.frequency ────────────────
     vocab <- colnames(phi)
+    if (is.null(vocab)) stop("phi has no colnames (vocab missing)")
     
-    # Get indices of documents that survived in dtm
-    valid_rows <- which(rowSums(as.matrix(doc_term)) > 0)
+    doc_length <- vapply(original_texts[text_idx],
+                         function(x) stri_count(x, regex = "\\S+"),
+                         integer(1))
+    doc_length[doc_length < 1] <- 1
     
-    # Subset theta and text_vector to match the filtered dtm
-    theta <- theta[valid_rows, , drop = FALSE]
-    text_vector_filtered <- text_vector[valid_rows]
+    term_freq <- colSums(as.matrix(dtm))[vocab]
+    term_freq[!is.finite(term_freq) | term_freq < 1] <- 1
     
-    # Now calculate doc.length on the filtered texts
-    doc_length <- vapply(text_vector_filtered, function(x) stri_count(x, regex = "\\S+"), integer(1))
-    
-    # Term frequencies from the filtered dtm
-    term_freq <- colSums(as.matrix(doc_term))
-    
-    json <- tryCatch({
+    # ── 9. Build JSON (cmdscale → prcomp fallback) ──────────────────
+    json <- tryCatch(
       LDAvis::createJSON(
-        phi = phi,
-        theta = theta,
-        vocab = vocab,
-        doc.length = doc_length,
-        term.frequency = term_freq,
-        mds.method = stats::cmdscale
-      )
-    }, error = function(e) {
-      LDAvis::createJSON(
-        phi = phi,
-        theta = theta,
-        vocab = vocab,
-        doc.length = doc_length,
-        term.frequency = term_freq,
-        mds.method = function(x) prcomp(x)$x[, 1:2]
-      )
-    })
+        phi            = phi,
+        theta          = theta,
+        vocab          = vocab,
+        doc.length     = doc_length,
+        term.frequency = as.numeric(term_freq),
+        mds.method     = stats::cmdscale
+      ),
+      error = function(e) {
+        LDAvis::createJSON(
+          phi            = phi,
+          theta          = theta,
+          vocab          = vocab,
+          doc.length     = doc_length,
+          term.frequency = as.numeric(term_freq),
+          mds.method     = function(x) prcomp(x)$x[, 1:2]
+        )
+      }
+    )
     
-    return(json)
+    json
   }
   
-  # ===== LDAvis Output for Addition =====
-  output$ldavis_output_addition <- renderUI({
-    req(comparison_done(), input$num_topics_addition, input$topic_dataset_addition)
-    
-    # ── 1. SAFE dataset selection – NEVER pass a closure (this fixes the exact error) ──
-    dataset <- switch(input$topic_dataset_addition,
-                      "Added Posts"    = { req(added_posts());    added_posts() },
-                      "Original Posts" = { req(original_posts()); original_posts() },
-                      "Combined View"  = {
-                        req(added_posts(), original_posts())
-                        bind_rows(
+  # ──────────────────────────────────────────────────────────────
+  # Fully dynamic "Number of Topics" slider, sized off dataset size
+  # (mirrors topic_k_range_addition logic in the Quarto report)
+  # ──────────────────────────────────────────────────────────────
+  output$num_topics_addition_ui <- renderUI({
+    n_docs_addition <- 0
+    if (isTRUE(comparison_done()) && !is.null(input$topic_dataset_addition)) {
+      dataset <- switch(input$topic_dataset_addition,
+                        "Added Posts"    = added_posts(),
+                        "Original Posts" = original_posts(),
+                        "Combined View"  = bind_rows(
                           added_posts()    %>% mutate(group = "added"),
                           original_posts() %>% mutate(group = "original")
                         )
-                      }
+      )
+      n_docs_addition <- if (is.null(dataset)) 0 else nrow(dataset)
+    }
+    
+    if (n_docs_addition < 500) {
+      k_min <- 3; k_max <- 15; k_step <- 1
+    } else {
+      k_min <- 5; k_max <- 25; k_step <- 5
+    }
+    
+    current <- isolate(input$num_topics_addition)
+    default_value <- if (is.null(current)) 5 else min(max(current, k_min), k_max)
+    
+    sliderInput("num_topics_addition", "Number of Topics:",
+                min = k_min, max = k_max, value = default_value, step = k_step)
+  })
+  
+  # ===== LDAvis Output for Addition =====
+  output$ldavis_output_addition <- renderUI({
+    req(comparison_done(), input$num_topics_addition)
+    # only render when the Topic Modeling sub-tab is actually selected
+    req(input$data_addition == "Topic Modeling")
+    
+    dataset_list <- list(
+      "Added Posts"    = added_posts(),
+      "Original Posts" = original_posts(),
+      "Combined View"  = bind_rows(
+        added_posts()    %>% mutate(group = "added"),
+        original_posts() %>% mutate(group = "original")
+      )
     )
     
-    # ── 2. Bullet-proof text column check (prevents closure being passed to clean) ──
-    if (!is.data.frame(dataset) || nrow(dataset) == 0) {
-      return(div(class = "alert alert-info", icon("info-circle"), "No posts available in this view."))
-    }
-    if (!"text" %in% names(dataset)) {
-      return(div(class = "alert alert-danger", "Error: 'text' column is missing."))
-    }
+    dataset <- dataset_list[[input$topic_dataset_addition]]
     
-    text_vec <- dataset$text
-    if (!is.character(text_vec)) {
-      return(div(class = "alert alert-danger", "Error: 'text' column must be character type."))
-    }
-    
-    # ── Your existing tiny-group check (kept exactly as you had it) ──
-    n_valid <- sum(!is.na(dataset$text) & nzchar(trimws(dataset$text)))
-    if (n_valid < 2) {
-      return(div(class = "alert alert-info",
-                 icon("info-circle"),
-                 tags$strong("Topic modeling skipped"),
-                 tags$p("Only ", n_valid, " valid document(s) in this view. ",
-                        "Topic modeling requires at least 2 documents with text."),
-                 tags$small("Other analyses (Word Frequency, Keyness, Sentiment) are still available.")))
-    }
-    
-    # ── Your existing diversity check (fixed the "texts" typo → now uses text_vec) ──
-    cleaned_sample <- head(dataset$cleaned_text, 500)
-    cleaned_sample <- cleaned_sample[nzchar(cleaned_sample)]
-    n_unique_clean <- length(unique(cleaned_sample))
-    
-    diversity_ratio <- n_unique_clean / min(n_valid, 500)
-    
-    if (diversity_ratio < 0.15 || n_unique_clean < 40) {
+    if (is.null(dataset) || nrow(dataset) < 10 || all(dataset$text %in% c("", " ", NA))) {
       return(div(class = "alert alert-warning",
-                 "Topic modeling not meaningful — very low text diversity",
-                 tags$br(),
-                 sprintf("Documents: %d   •   Unique cleaned (sample): %d (%.0f%% diversity)", 
-                         n_valid, n_unique_clean, 100 * diversity_ratio),
-                 tags$br(), tags$br(),
-                 "Likely caused by near-identical, cyclic or boilerplate content."
-      ))
+                 "Not enough meaningful documents for topic modeling (min ~10 non-empty required)"))
     }
     
-    # ── Everything below this line stays EXACTLY as you had it (your withProgress, cleaning, LDA, JSON, etc.) ──
     withProgress(message = 'Checking dataset size...', value = 0.1, {
       
       MAX_DOCS_FOR_TOPIC_MODELING <- 8000
@@ -1135,75 +1217,66 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
         )
       }
       
-      withProgress(message = 'Generating topics...', value = 0.5, {
+      # ── Only continue if size is ok ──
+      withProgress(message = 'Generating topics (LDA)', value = 0.4, {
+        incProgress(0.1, detail = "Building document-term matrix...")        
+        cleaned <- dataset$cleaned_text   # ← pre-cached
         
-        cleaned <- dataset$cleaned_text   # ← pre-cached (works for Added, Original and Combined View)        valid_docs <- which    (cleaned != "" & !is.na(cleaned))
-        valid_docs <- which(cleaned != "" & !is.na(cleaned))
-        
-        if (length(valid_docs) < 5) {
-          return(div(class = "alert alert-warning",
-                     "After preprocessing, fewer than 5 valid documents remain for topic modeling"))
+        valid_idx <- which(nzchar(trimws(cleaned)))
+        if (length(valid_idx) < 10) {
+          return(div(class = "alert alert-danger",
+                     "After cleaning, too few documents contain any words → topic modeling impossible"))
         }
         
-        cleaned <- cleaned[valid_docs]
-        corpus <- Corpus(VectorSource(cleaned))
+        cleaned_valid <- cleaned[valid_idx]
+        
+        corpus <- Corpus(VectorSource(cleaned_valid))
         dtm <- DocumentTermMatrix(corpus)
         dtm <- dtm[rowSums(as.matrix(dtm)) > 0, ]
         
-        if (nrow(dtm) < 5 || ncol(dtm) < 5) {
+        if (nrow(dtm) < 8 || ncol(dtm) < 5) {
           return(div(class = "alert alert-danger",
-                     "Topic modeling failed - insufficient meaningful text patterns after preprocessing"))
+                     "After cleaning & filtering: insufficient terms/documents for LDA"))
         }
         
-        n_unique <- length(unique(cleaned))
-        k_adaptive <- max(2, min(input$num_topics_addition, round(n_unique / 8)))
-        if (n_unique < 150) k_adaptive <- max(2, min(4, round(n_unique / 10)))
-        
-        lda_model <- tryCatch({
-          LDA(dtm, k = input$num_topics_addition, control = list(seed = 1234))
-        }, error = function(e) {
-          showNotification(paste("Error in topic modeling:", e$message), type = "error")
-          return(NULL)
+        # ── RESOURCE MONITOR ────────────────────────────────────────────
+        res <- peakRAM::peakRAM({
+          lda_model <- tryCatch(
+            LDA(dtm, k = input$num_topics_addition, control = list(seed = 1234)),
+            error = function(e) NULL
+          )
         })
+        cat(sprintf(
+          "[LDA-ADDITION] %.1f s | Peak RAM: %.0f MB | Total RAM: %.0f MB | docs=%d topics=%d\n",
+          res$Elapsed_Time_sec, res$Peak_RAM_Used_MiB, res$Total_RAM_Used_MiB,
+          nrow(dtm), input$num_topics_addition
+        ))
+        # ────────────────────────────────────────────────────────────────
         
         if (is.null(lda_model)) {
-          return(div(class = "alert alert-danger",
-                     "Topic modeling failed - please check your data"))
+          return(div(class = "alert alert-danger", "LDA failed to converge"))
         }
         
-        json <- topicmodels_json_ldavis(lda_model, cleaned, dtm)
+        json <- topicmodels_json_ldavis_safe(lda_model, cleaned_valid, dtm)
+        incProgress(0.4, detail = "Rendering LDAvis visualisation...")
         
         div(
-          style = "width: 100%; height: 80vh; min-height: 600px; max-height: 900px; 
-                 border: 1px solid #ddd; border-radius: 8px; overflow: hidden; 
-                 position: relative; background: white; margin-bottom: 20px;",
+          style = "width: 100%; height: 80vh; min-height: 650px; max-height: 90vh; 
+                 border: 1px solid #ddd; border-radius: 8px; overflow: auto; 
+                 background: white; margin-bottom: 25px;",
+          
           div(
             id = "ldavis-wrapper-addition",
-            style = "width: 100%; height: 100%; overflow: auto; position: relative;",
-            LDAvis::renderVis(json),
-            tags$script(HTML("
-  function cleanupLDAvisAddition() {
-    const wrapper = document.getElementById('ldavis-wrapper-addition');
-    if (!wrapper) return;
-    const sliders = wrapper.querySelectorAll('input[type=\"range\"]');
-    sliders.forEach((slider, i) => { if (i > 0) { const container = slider.closest('.ldavis-control') || slider.parentElement; if (container) container.remove(); } });
-    const labels = wrapper.querySelectorAll('.ldavis-control-label, .ldavis-control');
-    labels.forEach((label, i) => { if (i > 0) label.remove(); });
-    const radios = wrapper.querySelectorAll('input[type=\"radio\"][name=\"term\"]');
-    radios.forEach((radio, i) => { if (i >= 2) { const lbl = radio.closest('label') || radio.parentElement; if (lbl) lbl.remove(); } });
-    const vis = wrapper.querySelector('.vis, .ldavis, svg');
-    if (vis) { vis.style.width = '100%'; vis.style.height = '100%'; vis.style.display = 'block'; }
-  }
-  $(document).ready(() => { setTimeout(cleanupLDAvisAddition, 600); setTimeout(cleanupLDAvisAddition, 1800); });
-  $(document).on('shown.bs.tab', 'a[data-toggle=\"tab\"], .nav-link', function(e) { setTimeout(cleanupLDAvisAddition, 400); });
-  $(window).on('resize', () => { setTimeout(cleanupLDAvisAddition, 300); });
-"))
+            style = "min-width: 1000px; min-height: 800px; padding: 10px; box-sizing: border-box;",
+            LDAvis::renderVis(json)
           )
         )
         
-      })
-    })
-  })
+      })  # closes inner withProgress
+      
+    })    # closes outer withProgress
+    
+  })      # closes renderUI
   
   # Keyness alert
   output$keyness_alert_addition <- renderUI({

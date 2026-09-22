@@ -24,6 +24,8 @@ library(LDAvis)         # LDA visualization
 library(diffobj)        # For visual text diffs
 library(htmltools)      # HTML tools for Shiny
 library(bslib)          # Bootstrap library for Shiny
+library(bench)
+
 
 # Configuration constants
 MAX_DOCS_FOR_TOPIC_MODELING <- 15000
@@ -74,33 +76,6 @@ text_processor = list(
     }
   }
 )
-
-# ====================== #
-# 3. COMMON FUNCTIONS
-# ====================== #
-
-# Initialize shared reactive values
-# shared_data <- reactiveValues(
-#   data1 = NULL,
-#   data2 = NULL,
-#   edit_distances = NULL,
-#   comparison_done = FALSE,
-#   file1_uploaded = FALSE,
-#   file2_uploaded = FALSE
-# )
-# 
-# # === GDPR COMPLIANCE ENFORCEMENT ===
-# observe({
-#   if (!isTRUE(input$gdpr1)) {
-#     shinyjs::disable("file2")
-#     shinyjs::disable("compare")
-#     updateCheckboxInput(session, "gdpr2", value = FALSE)
-#   } else if (!isTRUE(input$gdpr2)) {
-#     shinyjs::disable("compare")
-#   } else if (shared_data$file1_uploaded && shared_data$file2_uploaded) {
-#     shinyjs::enable("compare")
-#   }
-# })
 
 # Function to detect the correct ID column
 detect_id_column <- function(df, manual_name = NULL) {

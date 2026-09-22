@@ -5,6 +5,7 @@
 dataDeletionModule <- function(input, output, session, shared_data, detect_id_column) {
   # Create a reactive value to track if comparison was done
   
+   
   comparison_done <- reactiveVal(FALSE)
 
   # Observe when compare button is pressed
@@ -128,9 +129,17 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     }
     df <- df1 %>% filter(!( !!sym(id1) %in% df2[[id2]] ))
     
-    # === CENTRAL CACHE: clean once ===
     df$cleaned_text <- if (nrow(df) > 0) {
-      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+      withProgress(
+        message = "Cleaning removed posts text",
+        detail  = "Removing stopwords, punctuation, lemmatizing...",
+        value   = 0.2,
+        {
+          result <- text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+          incProgress(0.8, detail = "Done")
+          result
+        }
+      )
     } else {
       character(0)
     }
@@ -139,7 +148,8 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
 
   # Get remaining posts
   remaining_posts <- eventReactive(input$compare, {
-    req(data1(), data2())
+
+        req(data1(), data2())
     df1 <- data1(); df2 <- data2()
     id1 <- detect_id_column(df1, input$id_col_1)
     id2 <- detect_id_column(df2, input$id_col_2)
@@ -148,9 +158,17 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
     }
     df <- df1 %>% filter( !!sym(id1) %in% df2[[id2]] )
     
-    # === CENTRAL CACHE: clean once ===
     df$cleaned_text <- if (nrow(df) > 0) {
-      text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+      withProgress(
+        message = "Cleaning remaining posts text",
+        detail  = "Removing stopwords, punctuation, lemmatizing...",
+        value   = 0.2,
+        {
+          result <- text_processor$clean(df$text, use_stem = FALSE, use_lemma = TRUE)
+          incProgress(0.8, detail = "Done")
+          result
+        }
+      )
     } else {
       character(0)
     }
@@ -223,9 +241,18 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
         closeButton = TRUE
       )}
     
-    word_freq <- text_processor$get_freq(cleaned_text) %>%
-      filter(freq > 1) %>%
-      slice(1:100)  # Add slicing to match original behavior
+    word_freq <- withProgress(
+      message = "Computing word frequencies (Removed)",
+      detail  = "Tokenizing and counting...",
+      value   = 0.3,
+      {
+        res <- text_processor$get_freq(cleaned_text) %>%
+          filter(freq > 1) %>%
+          slice(1:100)
+        incProgress(0.7)
+        res
+      }
+    )
 
     highchart() %>%
       hc_chart(type = "bar") %>%
@@ -289,9 +316,18 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
         closeButton = TRUE
       )}
     
-    word_freq <- text_processor$get_freq(cleaned_text) %>%
-      filter(freq > 1) %>%
-      slice(1:100)
+    word_freq <- withProgress(
+      message = "Computing word frequencies (Remaining)",
+      detail  = "Tokenizing and counting...",
+      value   = 0.3,
+      {
+        res <- text_processor$get_freq(cleaned_text) %>%
+          filter(freq > 1) %>%
+          slice(1:100)
+        incProgress(0.7)
+        res
+      }
+    )
 
     highchart() %>%
       hc_chart(type = "bar") %>%
@@ -371,9 +407,40 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
   }
 
   # ──────────────────────────────────────────────────────────────
+  # Fully dynamic "Number of Topics" slider, sized off dataset size
+  # (mirrors topic_k_range logic in the Quarto report)
+  # ──────────────────────────────────────────────────────────────
+  output$num_topics_ui <- renderUI({
+    n_docs <- 0
+    if (isTRUE(comparison_done()) && !is.null(input$topic_dataset)) {
+      dataset_list <- list(
+        "Removed Posts"   = removed_posts(),
+        "Remaining Posts" = remaining_posts(),
+        "Combined View"   = bind_rows(
+          removed_posts()   %>% mutate(group = "removed"),
+          remaining_posts() %>% mutate(group = "remaining")
+        )
+      )
+      dataset <- dataset_list[[input$topic_dataset]]
+      n_docs  <- if (is.null(dataset)) 0 else nrow(dataset)
+    }
+    
+    if (n_docs < 500) {
+      k_min <- 3; k_max <- 15; k_step <- 1
+    } else {
+      k_min <- 5; k_max <- 25; k_step <- 5
+    }
+    
+    current <- isolate(input$num_topics)
+    default_value <- if (is.null(current)) 5 else min(max(current, k_min), k_max)
+    
+    sliderInput("num_topics", "Number of Topics:",
+                min = k_min, max = k_max, value = default_value, step = k_step)
+  })
+  
+  # ──────────────────────────────────────────────────────────────
   # In renderUI($ldavis_output) – replace the whole modeling part:
   # ──────────────────────────────────────────────────────────────
-  
   output$ldavis_output <- renderUI({
     req(comparison_done(), input$num_topics)
     
@@ -429,8 +496,8 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
       }
       
       # ── Only continue if size is ok ──
-      withProgress(message = 'Generating topics...', value = 0.4, {
-        
+      withProgress(message = 'Generating topics (LDA)', value = 0.4, {
+        incProgress(0.1, detail = "Building document-term matrix...")
         cleaned <- dataset$cleaned_text   # ← pre-cached
         
         valid_idx <- which(nzchar(trimws(cleaned)))
@@ -450,16 +517,25 @@ dataDeletionModule <- function(input, output, session, shared_data, detect_id_co
                      "After cleaning & filtering: insufficient terms/documents for LDA"))
         }
         
-        lda_model <- tryCatch(
-          LDA(dtm, k = input$num_topics, control = list(seed = 1234)),
-          error = function(e) NULL
-        )
+        # ── RESOURCE MONITOR ────────────────────────────────────────────
+        res <- peakRAM::peakRAM({
+          lda_model <- tryCatch(
+            LDA(dtm, k = input$num_topics, control = list(seed = 1234)),
+            error = function(e) NULL
+          )
+        })
+        cat(sprintf(
+          "[LDA-DELETION] %.1f s | Peak RAM: %.0f MB | Total RAM: %.0f MB | docs=%d topics=%d\n",
+          res$Elapsed_Time_sec, res$Peak_RAM_Used_MiB, res$Total_RAM_Used_MiB,
+          nrow(dtm), input$num_topics
+        ))
         
         if (is.null(lda_model)) {
           return(div(class = "alert alert-danger", "LDA failed to converge"))
         }
         
         json <- topicmodels_json_ldavis_safe(lda_model, cleaned_valid, dtm)
+        incProgress(0.4, detail = "Rendering LDAvis visualisation...")
         
         div(
           style = "width: 100%; height: 80vh; min-height: 650px; max-height: 90vh; 
@@ -556,17 +632,26 @@ sentiment_data_removed <- reactive({
     return(NULL)
   }
   
-  scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
+  scores <- withProgress(
+    message = "Scoring sentiment (Removed Posts)",
+    detail  = paste0("Analysing ", length(text_data), " posts..."),
+    value   = 0.3,
+    {
+      s <- sentimentr::sentiment_by(text_data)$ave_sentiment
+      incProgress(0.7, detail = "Aggregating results...")
+      s
+    }
+  )
   
   neg_count <- sum(scores < 0, na.rm = TRUE)
-  neu_count <- sum(scores == 0, na.rm = TRUE)   # adjust range if your neutral is wider
+  neu_count <- sum(scores == 0, na.rm = TRUE)
   pos_count <- sum(scores > 0, na.rm = TRUE)
-  total <- length(scores)
+  total     <- length(scores)
   
   if (total == 0) return(NULL)
   
   list(
-    pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
+    pct   = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
     total = total
   )
 })
@@ -580,17 +665,26 @@ sentiment_data_remaining <- reactive({
     return(NULL)
   }
   
-  scores <- sentimentr::sentiment_by(text_data)$ave_sentiment
+  scores <- withProgress(
+    message = "Scoring sentiment (Remaining Posts)",
+    detail  = paste0("Analysing ", length(text_data), " posts..."),
+    value   = 0.3,
+    {
+      s <- sentimentr::sentiment_by(text_data)$ave_sentiment
+      incProgress(0.7, detail = "Aggregating results...")
+      s
+    }
+  )
   
   neg_count <- sum(scores < 0, na.rm = TRUE)
   neu_count <- sum(scores == 0, na.rm = TRUE)
   pos_count <- sum(scores > 0, na.rm = TRUE)
-  total <- length(scores)
+  total     <- length(scores)
   
   if (total == 0) return(NULL)
   
   list(
-    pct = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
+    pct   = c(neg_count / total * 100, neu_count / total * 100, pos_count / total * 100),
     total = total
   )
 })
@@ -782,7 +876,8 @@ keyness_analyzer <- list(
 keyness_results <- reactive({
   req(removed_posts(), remaining_posts())
   
-  withProgress(message = 'Analyzing key terms...', value = 0.5, {
+  withProgress(message = 'Computing keyness (deletion)', value = 0.15, {
+    incProgress(0.15, detail = "Preparing frequency table...")
     freq_table <- keyness_analyzer$prepare_data(removed_posts(), remaining_posts())
     measures <- keyness_analyzer$calculate_keyness(freq_table)
     
