@@ -1060,41 +1060,82 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
   })
   
   topicmodels_json_ldavis_safe <- function(fitted, original_texts, dtm) {
-    library(dplyr)
     library(stringi)
     
-    # Get indices of documents that survived filtering
-    valid_rows <- which(rowSums(as.matrix(dtm)) > 0)
+    # ── 1. Extract posteriors ────────────────────────────────────────
+    phi   <- as.matrix(topicmodels::posterior(fitted)$terms)   # K x V
+    theta <- as.matrix(topicmodels::posterior(fitted)$topics)  # D x K
     
-    # Subset everything to match the filtered DTM
-    phi    <- posterior(fitted)$terms %>% as.matrix()
-    theta  <- posterior(fitted)$topics[valid_rows, , drop = FALSE]
-    vocab  <- colnames(phi)
+    if (!identical(ncol(theta), nrow(phi)))
+      stop(sprintf("theta cols (%d) != phi rows (%d)", ncol(theta), nrow(phi)))
     
-    cleaned_valid <- original_texts[valid_rows]
-    doc_length <- vapply(cleaned_valid, function(x) stri_count(x, regex = "\\S+"), integer(1))
+    # ── 2. Scrub non-finite / negative ───────────────────────────────
+    phi[!is.finite(phi)]     <- 0
+    theta[!is.finite(theta)] <- 0
+    phi[phi   < 0] <- 0
+    theta[theta < 0] <- 0
     
-    term_freq <- colSums(as.matrix(dtm))
+    # ── 3. Drop effectively-empty topics (threshold, not > 0) ───────
+    keep_topic <- rowSums(phi) > 1e-10
+    if (!any(keep_topic)) stop("All topic rows in phi are effectively zero")
+    phi   <- phi[keep_topic, , drop = FALSE]
+    theta <- theta[, keep_topic, drop = FALSE]
     
-    json <- tryCatch({
+    # ── 4. Drop effectively-empty documents ─────────────────────────
+    keep_doc <- rowSums(theta) > 1e-10
+    if (!any(keep_doc)) stop("All doc rows in theta are effectively zero")
+    theta    <- theta[keep_doc, , drop = FALSE]
+    text_idx <- which(keep_doc)
+    
+    # ── 5. Row-normalise (LDAvis requires rows of phi to sum to 1) ──
+    phi   <- phi   / rowSums(phi)
+    theta <- theta / rowSums(theta)
+    
+    # ── 6. Clip FP noise, then renormalise once more ────────────────
+    phi[phi     < 0] <- 0
+    theta[theta < 0] <- 0
+    phi   <- phi   / rowSums(phi)
+    theta <- theta / rowSums(theta)
+    
+    # ── 7. Hard assertion before handing off to createJSON ──────────
+    bad <- which(abs(rowSums(phi) - 1) > 1e-6)
+    if (length(bad))
+      stop(sprintf("phi rows not 1 after normalisation: %s",
+                   paste(bad, collapse = ",")))
+    
+    # ── 8. Align vocab / doc.length / term.frequency ────────────────
+    vocab <- colnames(phi)
+    if (is.null(vocab)) stop("phi has no colnames (vocab missing)")
+    
+    doc_length <- vapply(original_texts[text_idx],
+                         function(x) stri_count(x, regex = "\\S+"),
+                         integer(1))
+    doc_length[doc_length < 1] <- 1
+    
+    term_freq <- colSums(as.matrix(dtm))[vocab]
+    term_freq[!is.finite(term_freq) | term_freq < 1] <- 1
+    
+    # ── 9. Build JSON (cmdscale → prcomp fallback) ──────────────────
+    json <- tryCatch(
       LDAvis::createJSON(
-        phi = phi,
-        theta = theta,
-        vocab = vocab,
-        doc.length = doc_length,
-        term.frequency = term_freq,
-        mds.method = stats::cmdscale
-      )
-    }, error = function(e) {
-      LDAvis::createJSON(
-        phi = phi,
-        theta = theta,
-        vocab = vocab,
-        doc.length = doc_length,
-        term.frequency = term_freq,
-        mds.method = function(x) prcomp(x)$x[, 1:2]
-      )
-    })
+        phi            = phi,
+        theta          = theta,
+        vocab          = vocab,
+        doc.length     = doc_length,
+        term.frequency = as.numeric(term_freq),
+        mds.method     = stats::cmdscale
+      ),
+      error = function(e) {
+        LDAvis::createJSON(
+          phi            = phi,
+          theta          = theta,
+          vocab          = vocab,
+          doc.length     = doc_length,
+          term.frequency = as.numeric(term_freq),
+          mds.method     = function(x) prcomp(x)$x[, 1:2]
+        )
+      }
+    )
     
     json
   }
@@ -1133,6 +1174,8 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
   # ===== LDAvis Output for Addition =====
   output$ldavis_output_addition <- renderUI({
     req(comparison_done(), input$num_topics_addition)
+    # only render when the Topic Modeling sub-tab is actually selected
+    req(input$data_addition == "Topic Modeling")
     
     dataset_list <- list(
       "Added Posts"    = added_posts(),

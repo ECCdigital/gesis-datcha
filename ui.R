@@ -187,6 +187,12 @@ tags$style(HTML("
   -moz-hyphens: auto !important;
   -ms-hyphens: auto !important;
 }
+/* ← add this: */
+#overview-page #compare,
+#overview-page #compare * {
+  text-align: center !important;
+}
+
                ")),   
                   
               tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"),
@@ -284,7 +290,8 @@ tags$style(HTML("
                                 uiOutput("id_validation_msg_2"),
                                 uiOutput("date_validation_msg_2"),
                                 hr(),
-                                actionButton("compare", "Compare Datasets", class = "btn-primary", width = "100%")
+                                actionButton("compare", "Compare Datasets", class = "btn-primary", width = "100%",
+                                             style = "display: block; text-align: center; margin-left: auto; margin-right: auto;")
                               ),
                               
                               mainPanel(
