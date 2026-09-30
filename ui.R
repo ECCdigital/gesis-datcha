@@ -632,7 +632,7 @@ tabPanel("Data Addition",
              h4("Prerequisites"),
              tags$ul(
                tags$li("R and Shiny: The app requires R and the Shiny framework."),
-               tags$li("Required Packages: Listed in global.R, including shiny, shinyjs, dplyr, tm, topicmodels, sentimentr, wordcloud2, highcharter, tidytext, DT, stringdist, shinyBS, quanteda, KeynessMeasures, SnowballC, textstem, LDAvis, diffobj, htmltools, and bslib."),
+               tags$li("Required Packages: Listed in global.R, including shiny, shinyjs, dplyr, tm, topicmodels, sentimentr, highcharter, tidytext, DT, stringdist, shinyBS, quanteda, KeynessMeasures, SnowballC, textstem, LDAvis, diffobj, htmltools, and bslib."),
                tags$li("Directory Setup: Ensure a www/ directory exists for storing diffobj.css.")
              ),
              h4("Running the App"),
@@ -680,7 +680,7 @@ tabPanel("Data Addition",
                tags$li("dataAdditionModule: Handles addition analysis."),
                tags$li("dataEditingModule: Handles edit analysis.")
              ),
-             p("These modules share data via a shared_data reactive object defined in global.R. The server updates shared_data based on module outputs and triggers UI updates."),
+             p("These modules share data via a shared_data reactive object created in server.R. The server updates shared_data based on module outputs and triggers UI updates."),
              h4("Shared Data"),
              p("The shared_data reactive object stores:"),
              tags$ul(
@@ -706,6 +706,8 @@ tabPanel("Data Addition",
                tags$li("Validates uploads for ID and text columns, and ensures date1 < date2."),
                tags$li("Displays validation messages (green for success, orange for warnings, red for errors).")
              ),
+             h4("LDAvis Rendering"),
+             p("The ldavis_iframe function renders each LDAvis visualization inside its own dedicated HTML iframe. This isolates the Deletion and Addition topic-model instances so their internal JavaScript (which relies on fixed element IDs) cannot interfere with one another."),
              hr(),
              h3("Dataset Upload and Validation"),
              h4("Upload Process"),
@@ -776,7 +778,7 @@ tabPanel("Data Addition",
                  tags$ul(
                    tags$li("Word Frequency: Bar charts comparing word frequencies in removed vs. remaining posts using highcharter."),
                    tags$li("Keyness Analysis: Identifies distinctive terms in removed vs. remaining posts using quanteda (Log-likelihood and Effect Size)."),
-                   tags$li("Topic Modeling: Visualizes topics in removed posts using LDAvis with controls for topic number and navigation."),
+                   tags$li("Topic Modeling: Visualizes topics in removed posts using LDAvis, rendered inside an isolated iframe so it can coexist with the Addition view. Limited to 8,000 documents per view for performance. Users can adjust the number of topics and switch between 'Removed', 'Remaining', and 'Combined' views."),
                    tags$li("Sentiment Analysis: Compares sentiment distributions in removed vs. remaining posts and highlights most positive/negative posts.")
                  )
                ),
@@ -806,7 +808,7 @@ tabPanel("Data Addition",
                  tags$ul(
                    tags$li("Word Frequency: Bar charts for added vs. original posts."),
                    tags$li("Keyness Analysis: Identifies distinctive terms in added vs. original posts."),
-                   tags$li("Topic Modeling: Visualizes topics in added, original, or combined posts with controls for topic number and dataset selection."),
+                   tags$li("Topic Modeling: Visualizes topics in added, original, or combined posts using LDAvis, rendered inside an isolated iframe. Limited to 8,000 documents per view. Users can adjust the number of topics and switch between 'Added', 'Original', and 'Combined' views."),
                    tags$li("Sentiment Analysis: Compares sentiment in added vs. original posts and highlights extreme posts.")
                  )
                ),
@@ -845,7 +847,7 @@ tabPanel("Data Addition",
                tags$ul(
                  tags$li("About: Describes Datcha’s purpose."),
                  tags$li("How to Use: Lists steps for uploading and analyzing data."),
-                 tags$li("Credits: Acknowledges developers (Dr. Yannik and Kunjan) and packages used."),
+                 tags$li("Credits: Acknowledges developers (Yannik and Kunjan) and packages used."),
                  tags$li("Contact: Directs users to contact their team lead for support.")
                )
              ),
@@ -867,7 +869,7 @@ tabPanel("Data Addition",
                ),
                tags$li("Topic Modeling:"),
                tags$ul(
-                 tags$li("Logic: Applies LDA with topicmodels to identify topics. Visualized with LDAvis for interactive exploration. Users can adjust the number of topics (2–10) and navigate topics with buttons.")
+                 tags$li("Logic: Applies LDA with topicmodels to identify topics. Visualized with LDAvis for interactive exploration. The 'Number of Topics' slider adapts to dataset size (3–15 for small datasets, 5–25 for larger ones). Each LDAvis instance is rendered inside its own iframe so the Deletion and Addition views operate independently. Topic modeling is capped at 8,000 documents per view to keep the app responsive.")
                ),
                tags$li("Sentiment Analysis:"),
                tags$ul(
@@ -887,7 +889,7 @@ tabPanel("Data Addition",
              tags$ul(
                tags$li("Invalid Data: Notifications are shown for missing ID/text columns or invalid dates."),
                tags$li("Empty Data: Checks for empty or invalid text data prevent crashes in analyses."),
-               tags$li("Topic Modeling: Requires at least 5 non-empty documents to proceed.")
+               tags$li("Topic Modeling: Requires at least 10 non-empty documents overall and at least 8 documents with content after cleaning; views larger than 8,000 documents are not modelled to keep the app responsive.")
              ),
              hr(),
              h3("Conclusion"),
