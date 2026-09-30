@@ -30,6 +30,26 @@ library(bench)
 # Configuration constants
 MAX_DOCS_FOR_TOPIC_MODELING <- 15000
 
+# ── LDAvis iframe helper ──────────────────────────────────────────
+# Renders each LDAvis visualization inside its own <iframe>, so the
+# Deletion and Addition tabs each get an isolated document. Without
+# this, LDAvis' JS (which uses fixed IDs like #sliderdiv, #bar-freqs)
+# always grabs the first instance on the page, and the second tab's
+# slider/bar-chart break.
+ldavis_iframe <- function(json, name, session = shiny::getDefaultReactiveDomain()) {
+  dir <- tempfile(pattern = paste0("ldavis-", name, "-"))
+  LDAvis::serVis(json, out.dir = dir, open.browser = FALSE)
+  prefix <- basename(dir)  # unique per render, avoids a cached lda.json
+  shiny::addResourcePath(prefix, dir)
+  session$onSessionEnded(function() {
+    shiny::removeResourcePath(prefix)
+    unlink(dir, recursive = TRUE)
+  })
+  # relative src (no leading slash), required because the app runs under /datcha/
+  tags$iframe(src = paste0(prefix, "/index.html"),
+              style = "width: 100%; height: 850px; border: 0;")
+}
+
 # ====================== #
 # 2. TEXT PROCESSING MODULE
 # ====================== #
@@ -95,6 +115,42 @@ common_data_handler <- function(input, output, session, shared_data) {
     shinyjs::disable("file2")
     shinyjs::disable("compare")
   })
+  
+  # ====================== #
+  # PROGRESS FEEDBACK HELPERS
+  # ====================== #
+  
+  # Show a persistent "task running" toast (bottom-right, doesn't block UI)
+  notify_task_start <- function(message,
+                                detail = "This may take a moment...",
+                                id     = "active_task_notification") {
+    showNotification(
+      ui = tags$div(
+        style = "display: flex; align-items: center; gap: 10px;",
+        tags$span(icon("spinner", class = "fa-spin fa-lg")),
+        tags$div(
+          tags$strong(message),
+          tags$br(),
+          tags$span(style = "font-size: 0.85em; opacity: 0.85;", detail)
+        )
+      ),
+      id = id,
+      duration = NULL,
+      closeButton = FALSE,
+      type = "message"
+    )
+  }
+  
+  # Replace the running toast with a short "done" toast
+  notify_task_done <- function(message = NULL,
+                               id      = "active_task_notification",
+                               type    = "default",
+                               duration = 3) {
+    removeNotification(id)
+    if (!is.null(message)) {
+      showNotification(message, type = type, duration = duration)
+    }
+  }
   
   # Disable Dataset 2 upload until GDPR1 checked
   observe({

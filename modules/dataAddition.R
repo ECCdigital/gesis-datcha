@@ -2,6 +2,20 @@
 # modules/dataAddition.R
 # ====================== #
 
+# # ── LDAvis iframe helper (defined here so it's always in scope) ──
+# ldavis_iframe <- function(json, name, session = shiny::getDefaultReactiveDomain()) {
+#   dir <- tempfile(pattern = paste0("ldavis-", name, "-"))
+#   LDAvis::serVis(json, out.dir = dir, open.browser = FALSE)
+#   prefix <- basename(dir)
+#   shiny::addResourcePath(prefix, dir)
+#   session$onSessionEnded(function() {
+#     shiny::removeResourcePath(prefix)
+#     unlink(dir, recursive = TRUE)
+#   })
+#   tags$iframe(src = paste0(prefix, "/index.html"),
+#               style = "width: 100%; height: 850px; border: 0;")
+# }
+
 dataAdditionModule <- function(input, output, session, shared_data,detect_id_column) {
   
   # Create a reactive value to track if comparison was done
@@ -1268,7 +1282,7 @@ dataAdditionModule <- function(input, output, session, shared_data,detect_id_col
           div(
             id = "ldavis-wrapper-addition",
             style = "min-width: 1000px; min-height: 800px; padding: 10px; box-sizing: border-box;",
-            LDAvis::renderVis(json)
+            ldavis_iframe(json, "addition", session)
           )
         )
         
